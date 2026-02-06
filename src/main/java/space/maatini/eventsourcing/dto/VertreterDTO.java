@@ -1,4 +1,4 @@
-package de.antigravity.eventsourcing.dto;
+package space.maatini.eventsourcing.dto;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -31,7 +31,7 @@ public record VertreterDTO(
     @Schema(description = "Aggregate version number")
     Integer version
 ) {
-    public static VertreterDTO from(de.antigravity.eventsourcing.entity.VertreterAggregate entity) {
+    public static VertreterDTO from(space.maatini.eventsourcing.entity.VertreterAggregate entity) {
         VertretenePersonDTO vertretenePerson = null;
         if (entity.vertretenePersonId != null) {
             vertretenePerson = new VertretenePersonDTO(

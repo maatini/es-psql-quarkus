@@ -1,9 +1,9 @@
-package de.antigravity.eventsourcing.service;
+package space.maatini.eventsourcing.service;
 
 import java.time.OffsetDateTime;
 
-import de.antigravity.eventsourcing.entity.CloudEvent;
-import de.antigravity.eventsourcing.entity.VertreterAggregate;
+import space.maatini.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.entity.VertreterAggregate;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
 import io.quarkus.scheduler.Scheduled;
@@ -148,7 +148,7 @@ public class VertreterProjectorService {
     }
 
     private Uni<Void> processEvent(CloudEvent event) {
-        if (!event.type.startsWith("de.vertreter.")) {
+        if (!event.type.startsWith("space.maatini.vertreter.")) {
             return markAsProcessed(event);
         }
 
@@ -162,11 +162,11 @@ public class VertreterProjectorService {
 
         Uni<Void> processingLogic;
         switch (event.type) {
-            case "de.vertreter.created":
-            case "de.vertreter.updated":
+            case "space.maatini.vertreter.created":
+            case "space.maatini.vertreter.updated":
                 processingLogic = applyUpsert(event, id, data);
                 break;
-            case "de.vertreter.deleted":
+            case "space.maatini.vertreter.deleted":
                 processingLogic = applyDelete(id);
                 break;
             default:

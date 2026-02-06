@@ -1,9 +1,9 @@
-package de.antigravity.eventsourcing.service;
+package space.maatini.eventsourcing.service;
 
 import java.util.List;
 
-import de.antigravity.eventsourcing.dto.VertreterDTO;
-import de.antigravity.eventsourcing.entity.VertreterAggregate;
+import space.maatini.eventsourcing.dto.VertreterDTO;
+import space.maatini.eventsourcing.entity.VertreterAggregate;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;

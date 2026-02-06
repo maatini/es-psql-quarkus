@@ -1,10 +1,10 @@
-package de.antigravity.eventsourcing.service;
+package space.maatini.eventsourcing.service;
 
 import java.util.List;
 import java.util.UUID;
 
-import de.antigravity.eventsourcing.dto.CloudEventDTO;
-import de.antigravity.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.dto.CloudEventDTO;
+import space.maatini.eventsourcing.entity.CloudEvent;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.json.JsonObject;

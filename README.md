@@ -56,7 +56,7 @@ curl -X POST http://localhost:8080/events \
   -d '{
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "source": "/vertreter-service",
-    "type": "de.vertreter.updated",
+    "type": "space.maatini.vertreter.updated",
     "subject": "v001",
     "data": {"id": "v001", "name": "Max Mustermann", "email": "max@example.com"}
   }'
@@ -186,9 +186,9 @@ Die Aggregation speichert diese Informationen automatisch in den Spalten `vertre
 
 | Typ | Beschreibung |
 |-----|--------------|
-| `de.vertreter.created` | Neuer Vertreter |
-| `de.vertreter.updated` | Vertreter aktualisiert |
-| `de.vertreter.deleted` | Vertreter gelöscht |
+| `space.maatini.vertreter.created` | Neuer Vertreter |
+| `space.maatini.vertreter.updated` | Vertreter aktualisiert |
+| `space.maatini.vertreter.deleted` | Vertreter gelöscht |
 
 ## Devbox Befehle
 
@@ -233,9 +233,9 @@ In derselben oder einer neuen Migration:
 CREATE OR REPLACE FUNCTION aggregate_abwesenheit()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.type LIKE 'de.abwesenheit.%' THEN
+    IF NEW.type LIKE 'space.maatini.abwesenheit.%' THEN
         CASE NEW.type
-            WHEN 'de.abwesenheit.created', 'de.abwesenheit.updated' THEN
+            WHEN 'space.maatini.abwesenheit.created', 'space.maatini.abwesenheit.updated' THEN
                 INSERT INTO abwesenheit_aggregate (id, mitarbeiter_id, von, bis, grund, updated_at, event_id, version)
                 VALUES (
                     NEW.data->>'id',
@@ -259,7 +259,7 @@ BEGIN
                 -- Mark as processed
                 UPDATE events SET processed_at = NOW() WHERE id = NEW.id;
                     
-            WHEN 'de.abwesenheit.deleted' THEN
+            WHEN 'space.maatini.abwesenheit.deleted' THEN
                 DELETE FROM abwesenheit_aggregate WHERE id = NEW.data->>'id';
                 UPDATE events SET processed_at = NOW() WHERE id = NEW.id;
         END CASE;
@@ -291,7 +291,7 @@ curl -X POST http://localhost:8080/events \
   -d '{
     "id": "550e8400-e29b-41d4-a716-446655440001",
     "source": "/hr-service",
-    "type": "de.abwesenheit.created",
+    "type": "space.maatini.abwesenheit.created",
     "subject": "abs-001",
     "data": {
       "id": "abs-001",

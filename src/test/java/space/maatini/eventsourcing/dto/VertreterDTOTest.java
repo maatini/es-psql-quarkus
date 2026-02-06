@@ -1,6 +1,6 @@
-package de.antigravity.eventsourcing.dto;
+package space.maatini.eventsourcing.dto;
 
-import de.antigravity.eventsourcing.entity.VertreterAggregate;
+import space.maatini.eventsourcing.entity.VertreterAggregate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

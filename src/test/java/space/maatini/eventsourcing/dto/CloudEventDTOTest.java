@@ -1,4 +1,4 @@
-package de.antigravity.eventsourcing.dto;
+package space.maatini.eventsourcing.dto;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -37,16 +37,15 @@ class CloudEventDTOTest {
         @DisplayName("Minimal valid event")
         void minimalValidEvent() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                null,  // specversion - optional
-                "de.test.event",
-                null,  // subject - optional
-                null,  // time - optional
-                null,  // datacontenttype - optional
-                null,  // dataschema - optional
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    "/source",
+                    null, // specversion - optional
+                    "de.test.event",
+                    null, // subject - optional
+                    null, // time - optional
+                    null, // datacontenttype - optional
+                    null, // dataschema - optional
+                    Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertTrue(violations.isEmpty(), "Should have no violations: " + violations);
@@ -56,16 +55,15 @@ class CloudEventDTOTest {
         @DisplayName("Full valid event")
         void fullValidEvent() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/my-service",
-                "1.0",
-                "de.vertreter.updated",
-                "v001",
-                OffsetDateTime.now(),
-                "application/json",
-                "https://schema.example.com/vertreter.json",
-                Map.of("id", "v001", "name", "Test")
-            );
+                    UUID.randomUUID(),
+                    "/my-service",
+                    "1.0",
+                    "space.maatini.vertreter.updated",
+                    "v001",
+                    OffsetDateTime.now(),
+                    "application/json",
+                    "https://schema.example.com/vertreter.json",
+                    Map.of("id", "v001", "name", "Test"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertTrue(violations.isEmpty());
@@ -75,15 +73,15 @@ class CloudEventDTOTest {
         @DisplayName("Empty data map is valid")
         void emptyDataMapIsValid() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                "1.0",
-                "de.test.event",
-                null,
-                null,
-                null,
-                null,
-                Map.of()  // empty but not null
+                    UUID.randomUUID(),
+                    "/source",
+                    "1.0",
+                    "de.test.event",
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of() // empty but not null
             );
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -99,16 +97,15 @@ class CloudEventDTOTest {
         @DisplayName("Null ID is invalid")
         void nullIdIsInvalid() {
             CloudEventDTO dto = new CloudEventDTO(
-                null,  // null ID
-                "/source",
-                "1.0",
-                "de.test.event",
-                null,
-                null,
-                null,
-                null,
-                Map.of("key", "value")
-            );
+                    null, // null ID
+                    "/source",
+                    "1.0",
+                    "de.test.event",
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertEquals(1, violations.size());
@@ -119,16 +116,15 @@ class CloudEventDTOTest {
         @DisplayName("Blank source is invalid")
         void blankSourceIsInvalid() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "",  // blank source
-                "1.0",
-                "de.test.event",
-                null,
-                null,
-                null,
-                null,
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    "", // blank source
+                    "1.0",
+                    "de.test.event",
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertEquals(1, violations.size());
@@ -139,16 +135,15 @@ class CloudEventDTOTest {
         @DisplayName("Null source is invalid")
         void nullSourceIsInvalid() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                null,  // null source
-                "1.0",
-                "de.test.event",
-                null,
-                null,
-                null,
-                null,
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    null, // null source
+                    "1.0",
+                    "de.test.event",
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertFalse(violations.isEmpty());
@@ -158,16 +153,15 @@ class CloudEventDTOTest {
         @DisplayName("Blank type is invalid")
         void blankTypeIsInvalid() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                "1.0",
-                "",  // blank type
-                null,
-                null,
-                null,
-                null,
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    "/source",
+                    "1.0",
+                    "", // blank type
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertEquals(1, violations.size());
@@ -178,16 +172,15 @@ class CloudEventDTOTest {
         @DisplayName("Null type is invalid")
         void nullTypeIsInvalid() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                "1.0",
-                null,  // null type
-                null,
-                null,
-                null,
-                null,
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    "/source",
+                    "1.0",
+                    null, // null type
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
             assertFalse(violations.isEmpty());
@@ -197,15 +190,15 @@ class CloudEventDTOTest {
         @DisplayName("Null data is invalid")
         void nullDataIsInvalid() {
             CloudEventDTO dto = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                "1.0",
-                "de.test.event",
-                null,
-                null,
-                null,
-                null,
-                null  // null data
+                    UUID.randomUUID(),
+                    "/source",
+                    "1.0",
+                    "de.test.event",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null // null data
             );
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -222,24 +215,23 @@ class CloudEventDTOTest {
         @DisplayName("Applies defaults to optional fields")
         void appliesDefaults() {
             CloudEventDTO original = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                null,  // no specversion
-                "de.test.event",
-                null,  // no subject
-                null,  // no time
-                null,  // no datacontenttype
-                null,  // no dataschema
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    "/source",
+                    null, // no specversion
+                    "de.test.event",
+                    null, // no subject
+                    null, // no time
+                    null, // no datacontenttype
+                    null, // no dataschema
+                    Map.of("key", "value"));
 
             CloudEventDTO withDefaults = original.withDefaults();
 
             assertEquals("1.0", withDefaults.specversion());
             assertEquals("application/json", withDefaults.datacontenttype());
             assertNotNull(withDefaults.time());
-            assertNull(withDefaults.subject());  // Still null - no default
-            assertNull(withDefaults.dataschema());  // Still null - no default
+            assertNull(withDefaults.subject()); // Still null - no default
+            assertNull(withDefaults.dataschema()); // Still null - no default
         }
 
         @Test
@@ -247,16 +239,15 @@ class CloudEventDTOTest {
         void preservesExistingValues() {
             OffsetDateTime customTime = OffsetDateTime.parse("2025-06-01T12:00:00Z");
             CloudEventDTO original = new CloudEventDTO(
-                UUID.randomUUID(),
-                "/source",
-                "2.0",  // custom specversion
-                "de.test.event",
-                "my-subject",
-                customTime,
-                "text/plain",
-                "https://schema.example.com",
-                Map.of("key", "value")
-            );
+                    UUID.randomUUID(),
+                    "/source",
+                    "2.0", // custom specversion
+                    "de.test.event",
+                    "my-subject",
+                    customTime,
+                    "text/plain",
+                    "https://schema.example.com",
+                    Map.of("key", "value"));
 
             CloudEventDTO withDefaults = original.withDefaults();
 

@@ -1,4 +1,4 @@
-package de.antigravity.eventsourcing.entity;
+package space.maatini.eventsourcing.entity;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

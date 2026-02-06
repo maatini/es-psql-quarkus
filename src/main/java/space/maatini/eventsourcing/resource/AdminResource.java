@@ -1,6 +1,6 @@
-package de.antigravity.eventsourcing.resource;
+package space.maatini.eventsourcing.resource;
 
-import de.antigravity.eventsourcing.service.VertreterProjectorService;
+import space.maatini.eventsourcing.service.VertreterProjectorService;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;

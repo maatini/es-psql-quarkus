@@ -1,4 +1,4 @@
-package de.antigravity.eventsourcing.exception;
+package space.maatini.eventsourcing.exception;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;

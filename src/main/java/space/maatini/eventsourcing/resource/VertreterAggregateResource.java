@@ -1,7 +1,7 @@
-package de.antigravity.eventsourcing.resource;
+package space.maatini.eventsourcing.resource;
 
-import de.antigravity.eventsourcing.dto.VertreterDTO;
-import de.antigravity.eventsourcing.service.VertreterAggregateService;
+import space.maatini.eventsourcing.dto.VertreterDTO;
+import space.maatini.eventsourcing.service.VertreterAggregateService;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;

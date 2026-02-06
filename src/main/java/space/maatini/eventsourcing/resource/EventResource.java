@@ -1,10 +1,10 @@
-package de.antigravity.eventsourcing.resource;
+package space.maatini.eventsourcing.resource;
 
 import java.net.URI;
 import java.util.UUID;
 
-import de.antigravity.eventsourcing.dto.CloudEventDTO;
-import de.antigravity.eventsourcing.service.EventService;
+import space.maatini.eventsourcing.dto.CloudEventDTO;
+import space.maatini.eventsourcing.service.EventService;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;

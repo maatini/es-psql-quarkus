@@ -1,4 +1,4 @@
-package de.antigravity.eventsourcing.entity;
+package space.maatini.eventsourcing.entity;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -12,7 +12,8 @@ import jakarta.persistence.Table;
 
 /**
  * Read-only aggregate entity for Vertreter.
- * The state is computed by PostgreSQL triggers, not by this application.
+ * The state is computed by the Java application (VertreterProjectorService),
+ * not by DB triggers.
  */
 @Entity
 @Table(name = "vertreter_aggregate")
