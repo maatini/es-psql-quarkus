@@ -1,5 +1,8 @@
 # es-psql-quarkus
 
+![Project Banner](doc/banner_placeholder.png)
+
+
 High-Performance Event Sourcing Template mit Quarkus und PostgreSQL Listen/Notify.
 Ein reaktiver Eventsourcing-Microservice mit Quarkus, CloudEvents und asynchronen PostgreSQL-Projektionen (CQRS).
 
