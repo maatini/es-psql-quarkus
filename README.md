@@ -1,6 +1,7 @@
-# Event Sourcing Microservice
+# es-psql-quarkus
 
-Quarkus-basierter Microservice mit Event Sourcing, CloudEvents-Standard und PostgreSQL-Aggregation.
+High-Performance Event Sourcing Template mit Quarkus und PostgreSQL Listen/Notify.
+Ein reaktiver Eventsourcing-Microservice mit Quarkus, CloudEvents und asynchronen PostgreSQL-Projektionen (CQRS).
 
 ## Voraussetzungen
 
@@ -76,6 +77,15 @@ curl http://localhost:8080/aggregates/vertreter/v001
 │ REST API    │◀────│ AggService  │◀────│ vertreter_aggregate │
 └─────────────┘     └─────────────┘     └─────────────────────┘
 ```
+
+## Anwendungsfälle
+
+Dieser Architektur-Ansatz eignet sich besonders für:
+
+*   **Revisionssicherheit (Audit-Log)**: Vollständige Historie aller Änderungen (wer, wann, was), unverzichtbar für Compliance-kritische Bereiche (z.B. Vertreter-Vollmachten).
+*   **High-Performance CQRS**: Trennung von Schreib- (Events) und Leselast (Aggregates). Das Lesemodell kann für spezifische UI-Anforderungen optimiert werden.
+*   **Zeitpunkt-Bezogene Abfragen**: Möglichkeit, den Zustand des Systems zu jedem beliebigen Zeitpunkt in der Vergangenheit zu rekonstruieren ("Time Travel").
+*   **Entkopplung**: Andere Services können asynchron auf Events reagieren (z.B. per Kafka-Connect auf die `events`-Tabelle), ohne die interne Logik zu kennen.
 
 ## Dynamische Aggregation
 
