@@ -1,0 +1,96 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/main/.schema/devbox.schema.json",
+  "packages": [
+    "jdk21@latest",
+    "maven@latest",
+    "quarkus@latest",
+    "postgresql@17",
+    "k6@latest"
+  ],
+  "env": {
+    "JAVA_HOME":  "$DEVBOX_PACKAGES_DIR/lib/openjdk",
+    "PGDATA":     "$PWD/.devbox/pgdata",
+    "PGHOST":     "localhost",
+    "PGPORT":     "5432",
+    "PGUSER":     "$USER",
+    "PGDATABASE": "devdb"
+  },
+  "shell": {
+    "init_hook": [
+      "echo '🚀 Quarkus + PostgreSQL Entwicklungsumgebung'",
+      "echo \"   Java:       $(java --version 2>&1 | head -1)\"",
+      "echo \"   Maven:      $(mvn --version 2>&1 | head -1)\"",
+      "echo \"   Quarkus:    $(quarkus --version 2>&1)\"",
+      "echo \"   PostgreSQL: $(postgres --version)\"",
+      "echo ''",
+      "echo '📋 Verfügbare Befehle:'",
+      "echo '   pg:start    - PostgreSQL starten'",
+      "echo '   pg:stop     - PostgreSQL stoppen'",
+      "echo '   pg:status   - PostgreSQL Status'",
+      "echo '   pg:create   - Entwicklungsdatenbank erstellen'",
+      "echo '   quarkus:dev - Quarkus im Dev-Modus starten'",
+      "echo '   quarkus:new - Neues Quarkus-Projekt erstellen'"
+    ],
+    "scripts": {
+      "pg:init": [
+        "if [ ! -d \"$PGDATA\" ]; then",
+        "  echo '📦 Initialisiere PostgreSQL Datenverzeichnis...'",
+        "  initdb -D \"$PGDATA\" --auth=trust --no-locale --encoding=UTF8",
+        "  echo \"listen_addresses = 'localhost'\" >> \"$PGDATA/postgresql.conf\"",
+        "  echo \"port = $PGPORT\" >> \"$PGDATA/postgresql.conf\"",
+        "  echo '✅ PostgreSQL initialisiert'",
+        "else",
+        "  echo '⚠️  PostgreSQL Datenverzeichnis existiert bereits'",
+        "fi"
+      ],
+      "pg:start": [
+        "devbox run pg:init",
+        "if pg_ctl status -D \"$PGDATA\" > /dev/null 2>&1; then",
+        "  echo '⚠️  PostgreSQL läuft bereits'",
+        "else",
+        "  echo '🚀 Starte PostgreSQL...'",
+        "  pg_ctl start -D \"$PGDATA\" -l \"$PGDATA/postgres.log\"",
+        "  sleep 2",
+        "  echo '✅ PostgreSQL gestartet auf Port $PGPORT'",
+        "fi"
+      ],
+      "pg:stop": [
+        "if pg_ctl status -D \"$PGDATA\" > /dev/null 2>&1; then",
+        "  echo '🛑 Stoppe PostgreSQL...'",
+        "  pg_ctl stop -D \"$PGDATA\"",
+        "  echo '✅ PostgreSQL gestoppt'",
+        "else",
+        "  echo '⚠️  PostgreSQL läuft nicht'",
+        "fi"
+      ],
+      "pg:status": [
+        "pg_ctl status -D \"$PGDATA\" || echo '❌ PostgreSQL ist nicht gestartet'"
+      ],
+      "pg:create": [
+        "devbox run pg:start",
+        "if psql -lqt | cut -d \\| -f 1 | grep -qw \"$PGDATABASE\"; then",
+        "  echo '⚠️  Datenbank $PGDATABASE existiert bereits'",
+        "else",
+        "  echo '📦 Erstelle Datenbank $PGDATABASE...'",
+        "  createdb \"$PGDATABASE\"",
+        "  echo '✅ Datenbank $PGDATABASE erstellt'",
+        "fi"
+      ],
+      "pg:psql": [
+        "psql -d \"$PGDATABASE\""
+      ],
+      "quarkus:dev": [
+        "devbox run pg:start",
+        "./mvnw quarkus:dev"
+      ],
+      "quarkus:new": [
+        "echo '🆕 Erstelle neues Quarkus-Projekt mit PostgreSQL-Unterstützung...'",
+        "quarkus create app --extension='resteasy-reactive,resteasy-reactive-jackson,hibernate-orm-panache,jdbc-postgresql,smallrye-health' --no-code"
+      ],
+      "quarkus:new-kotlin": [
+        "echo '🆕 Erstelle neues Kotlin Quarkus-Projekt mit PostgreSQL-Unterstützung...'",
+        "quarkus create app --extension='kotlin,resteasy-reactive,resteasy-reactive-jackson,hibernate-orm-panache-kotlin,jdbc-postgresql,smallrye-health' --no-code"
+      ]
+    }
+  }
+}
