@@ -13,7 +13,7 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.Matchers.emptyOrNullString;
+
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 
 /**
@@ -281,6 +281,56 @@ class EventResourceTest {
                     .then()
                     .statusCode(400);
         }
+
+        @Test
+        @DisplayName("POST /events - Empty JSON object returns 400")
+        void emptyJsonObject_returns400() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .body("{}")
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(400);
+        }
+
+        @Test
+        @DisplayName("POST /events - Whitespace-only source returns 400")
+        void whitespaceOnlySource_returns400() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .body("""
+                            {
+                                "id": "%s",
+                                "source": "   ",
+                                "type": "de.test.event",
+                                "data": {"key": "value"}
+                            }
+                            """.formatted(UUID.randomUUID()))
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(400);
+        }
+
+        @Test
+        @DisplayName("POST /events - Whitespace-only type returns 400")
+        void whitespaceOnlyType_returns400() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .body("""
+                            {
+                                "id": "%s",
+                                "source": "/test-service",
+                                "type": "   ",
+                                "data": {"key": "value"}
+                            }
+                            """.formatted(UUID.randomUUID()))
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(400);
+        }
     }
 
     // ==================== BOUNDARY TESTS ====================
@@ -421,6 +471,49 @@ class EventResourceTest {
                     .then()
                     .statusCode(201)
                     .body("time", containsString("2025-01-01"));
+        }
+
+        @Test
+        @DisplayName("GET /events/subject/{subject} - Unknown subject returns empty list")
+        void getEventsBySubject_unknownSubject_returnsEmptyList() {
+            given()
+                    .when()
+                    .get(EVENTS_PATH + "/subject/totally-unknown-subject-" + UUID.randomUUID())
+                    .then()
+                    .statusCode(200)
+                    .body("size()", equalTo(0));
+        }
+
+        @Test
+        @DisplayName("GET /events/type/{type} - Unknown type returns empty list")
+        void getEventsByType_unknownType_returnsEmptyList() {
+            given()
+                    .when()
+                    .get(EVENTS_PATH + "/type/com.nonexistent.event.type." + UUID.randomUUID())
+                    .then()
+                    .statusCode(200)
+                    .body("size()", equalTo(0));
+        }
+
+        @Test
+        @DisplayName("POST /events - Very large data payload is accepted")
+        void veryLargeDataPayload_accepted() {
+            // Build a ~100KB value
+            String largeValue = "x".repeat(100_000);
+            given()
+                    .contentType(ContentType.JSON)
+                    .body("""
+                            {
+                                "id": "%s",
+                                "source": "/test-service",
+                                "type": "de.test.large",
+                                "data": {"bigField": "%s"}
+                            }
+                            """.formatted(UUID.randomUUID(), largeValue))
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(201);
         }
     }
 

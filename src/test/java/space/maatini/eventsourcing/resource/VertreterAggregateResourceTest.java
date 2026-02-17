@@ -9,7 +9,6 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 
 import java.util.UUID;
-import jakarta.inject.Inject;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
@@ -29,11 +28,18 @@ class VertreterAggregateResourceTest {
     private static final String EVENTS_PATH = "/events";
 
     private void awaitProjection() {
-        // Trigger projection via REST API to run in correct Vert.x context
-        given()
-                .post("/admin/projection/trigger")
-                .then()
-                .statusCode(200);
+        // Trigger projection via REST API, draining ALL unprocessed events.
+        // This is necessary because the shared DB may have many events pending
+        // (e.g. after a replay test), and processBatch only handles 50 at a time.
+        for (int i = 0; i < 1000; i++) {
+            int processed = given()
+                    .post("/admin/projection/trigger")
+                    .then()
+                    .statusCode(200)
+                    .extract().path("processed");
+            if (processed == 0)
+                break;
+        }
     }
 
     // ==================== HAPPY PATH TESTS ====================
@@ -427,6 +433,178 @@ class VertreterAggregateResourceTest {
                 .statusCode(200)
                 .body("name", equalTo("Has Name"))
                 .body("email", is(nullValue()));
+    }
+
+    // ==================== HANDLER EDGE CASE TESTS ====================
+
+    @Test
+    @Order(20)
+    @DisplayName("Event with missing data.id is processed without error")
+    void eventWithMissingIdInData_stillProcessed() {
+        // Send a vertreter.created event without data.id
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "id": "%s",
+                            "source": "/test-service",
+                            "type": "space.maatini.vertreter.created",
+                            "data": {"name": "No ID Protagonist", "email": "noid@test.com"}
+                        }
+                        """.formatted(UUID.randomUUID()))
+                .when()
+                .post(EVENTS_PATH)
+                .then()
+                .statusCode(201);
+
+        // Trigger projection – should not crash
+        awaitProjection();
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("Delete event for non-existing aggregate does not crash")
+    void deleteNonExistingAggregate_noError() {
+        String nonExistingId = "ghost-" + UUID.randomUUID().toString().substring(0, 8);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "id": "%s",
+                            "source": "/test-service",
+                            "type": "space.maatini.vertreter.deleted",
+                            "data": {"id": "%s"}
+                        }
+                        """.formatted(UUID.randomUUID(), nonExistingId))
+                .when()
+                .post(EVENTS_PATH)
+                .then()
+                .statusCode(201);
+
+        // Should not crash
+        awaitProjection();
+
+        // Still 404
+        given()
+                .when()
+                .get(AGGREGATES_PATH + "/" + nonExistingId)
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    @Order(22)
+    @DisplayName("Update event without prior create acts as upsert")
+    void updateNonExistingAggregate_createsNew() {
+        String upsertId = "upsert-" + UUID.randomUUID().toString().substring(0, 8);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                            "id": "%s",
+                            "source": "/test-service",
+                            "type": "space.maatini.vertreter.updated",
+                            "data": {"id": "%s", "name": "Born from Update", "email": "upsert@test.com"}
+                        }
+                        """.formatted(UUID.randomUUID(), upsertId))
+                .when()
+                .post(EVENTS_PATH)
+                .then()
+                .statusCode(201);
+
+        awaitProjection();
+
+        // Should exist even though we never sent a .created event
+        given()
+                .when()
+                .get(AGGREGATES_PATH + "/" + upsertId)
+                .then()
+                .statusCode(200)
+                .body("name", equalTo("Born from Update"));
+    }
+
+    @Test
+    @Order(23)
+    @DisplayName("Full lifecycle: create → update → update → delete")
+    void multipleHandlersInSequence() {
+        String lcId = "lifecycle-" + UUID.randomUUID().toString().substring(0, 8);
+
+        // Create
+        given().contentType(ContentType.JSON).body("""
+                {"id": "%s", "source": "/t", "type": "space.maatini.vertreter.created",
+                 "data": {"id": "%s", "name": "V1", "email": "lc@test.com"}}
+                """.formatted(UUID.randomUUID(), lcId))
+                .post(EVENTS_PATH).then().statusCode(201);
+        awaitProjection();
+
+        given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(200)
+                .body("name", equalTo("V1")).body("version", equalTo(1));
+
+        // Update 1
+        given().contentType(ContentType.JSON).body("""
+                {"id": "%s", "source": "/t", "type": "space.maatini.vertreter.updated",
+                 "data": {"id": "%s", "name": "V2"}}
+                """.formatted(UUID.randomUUID(), lcId))
+                .post(EVENTS_PATH).then().statusCode(201);
+        awaitProjection();
+
+        given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(200)
+                .body("name", equalTo("V2")).body("version", equalTo(2));
+
+        // Update 2
+        given().contentType(ContentType.JSON).body("""
+                {"id": "%s", "source": "/t", "type": "space.maatini.vertreter.updated",
+                 "data": {"id": "%s", "email": "lc-v3@test.com"}}
+                """.formatted(UUID.randomUUID(), lcId))
+                .post(EVENTS_PATH).then().statusCode(201);
+        awaitProjection();
+
+        given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(200)
+                .body("name", equalTo("V2")) // preserved
+                .body("email", equalTo("lc-v3@test.com"))
+                .body("version", equalTo(3));
+
+        // Delete
+        given().contentType(ContentType.JSON).body("""
+                {"id": "%s", "source": "/t", "type": "space.maatini.vertreter.deleted",
+                 "data": {"id": "%s"}}
+                """.formatted(UUID.randomUUID(), lcId))
+                .post(EVENTS_PATH).then().statusCode(201);
+        awaitProjection();
+
+        given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(404);
+    }
+
+    @Test
+    @Order(24)
+    @DisplayName("Update vertretene Person data on existing aggregate")
+    void updateVertretenePersonData() {
+        String vpId = "vp-update-" + UUID.randomUUID().toString().substring(0, 8);
+
+        // Create without vertretene Person
+        given().contentType(ContentType.JSON).body("""
+                {"id": "%s", "source": "/t", "type": "space.maatini.vertreter.created",
+                 "data": {"id": "%s", "name": "VP Holder", "email": "vp-h@test.com"}}
+                """.formatted(UUID.randomUUID(), vpId))
+                .post(EVENTS_PATH).then().statusCode(201);
+        awaitProjection();
+
+        given().get(AGGREGATES_PATH + "/" + vpId).then().statusCode(200)
+                .body("vertretenePerson", is(nullValue()));
+
+        // Update with vertretene Person
+        given().contentType(ContentType.JSON).body("""
+                {"id": "%s", "source": "/t", "type": "space.maatini.vertreter.updated",
+                 "data": {"id": "%s", "vertretenePerson": {"id": "p-new-1", "name": "New Person"}}}
+                """.formatted(UUID.randomUUID(), vpId))
+                .post(EVENTS_PATH).then().statusCode(201);
+        awaitProjection();
+
+        given().get(AGGREGATES_PATH + "/" + vpId).then().statusCode(200)
+                .body("vertretenePerson.id", equalTo("p-new-1"))
+                .body("vertretenePerson.name", equalTo("New Person"));
     }
 
     // ==================== HELPER METHODS ====================
