@@ -129,6 +129,17 @@ public class AbwesenheitHandler implements VertreterEventHandler {
 devbox run k6 run benchmarks/load-test.js
 ```
 
+### Performance (M1 Max Local)
+
+| Metrik | Ergebnis |
+|--------|----------|
+| **Throughput** | ~153 req/s |
+| **P95 Latency** | 9.37 ms |
+| **Error Rate** | 0% |
+| **VUs** | 20 |
+
+*Messung auf Apple M1 Max (32GB RAM), Local Dev Environment.*
+
 ## Devbox Befehle
 
 | Befehl                    | Beschreibung                          |

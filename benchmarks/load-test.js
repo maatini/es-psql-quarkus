@@ -22,7 +22,7 @@ export default function () {
   const payload = JSON.stringify({
     id: eventId,
     source: '/k6-benchmark',
-    type: 'de.vertreter.created',
+    type: 'space.maatini.vertreter.created',
     subject: vertreterId,
     data: {
       id: vertreterId,
