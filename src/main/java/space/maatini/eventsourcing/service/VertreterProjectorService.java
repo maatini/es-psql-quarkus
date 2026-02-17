@@ -15,7 +15,7 @@ import jakarta.enterprise.event.Observes;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.runtime.ShutdownEvent;
 
-import io.vertx.mutiny.pgclient.PgConnection;
+import io.vertx.mutiny.sqlclient.SqlConnection;
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.core.Vertx;
 
@@ -44,7 +44,7 @@ public class VertreterProjectorService {
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
-    private volatile PgConnection listeningConnection;
+    private volatile SqlConnection listeningConnection;
 
     public VertreterProjectorService(PgPool pgPool, Vertx vertx) {
         this.pgPool = pgPool;
@@ -69,18 +69,30 @@ public class VertreterProjectorService {
         Log.info("Starting listener for 'events_channel'...");
 
         pgPool.getConnection()
-                .map(PgConnection.class::cast)
                 .invoke(conn -> {
                     this.listeningConnection = conn;
+
+                    // Access the underlying Vert.x connection to set the notification handler
+                    io.vertx.sqlclient.SqlConnection delegate = conn.getDelegate();
+                    if (delegate instanceof io.vertx.pgclient.PgConnection pgConn) {
+                        pgConn.notificationHandler(notification -> {
+                            Log.debugf("Received notification: %s", notification.getPayload());
+                            // Run on a 'safe' context by using executeBlocking.
+                            // Quarkus flags worker threads as safe for Hibernate Reactive.
+                            vertx.executeBlocking(Uni.createFrom().item(() -> {
+                                triggerProcessing();
+                                return null;
+                            })).subscribe().with(v -> {
+                            });
+                        });
+                    } else {
+                        Log.warn("Connection is not a Postgres connection, cannot listen for notifications");
+                    }
+
                     conn.query("LISTEN events_channel").execute()
                             .subscribe().with(
                                     item -> Log.info("Listening on 'events_channel'"),
                                     failure -> Log.error("Failed to LISTEN", failure));
-
-                    conn.notificationHandler(notification -> {
-                        Log.debugf("Received notification: %s", notification.getPayload());
-                        triggerProcessing();
-                    });
                 })
                 .subscribe().with(
                         conn -> {
