@@ -6,6 +6,7 @@ import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.vertx.core.runtime.context.VertxContextSafetyToggle;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.pgclient.PgPool;
@@ -74,7 +75,11 @@ public class VertreterProjectorService {
                     if (delegate instanceof io.vertx.pgclient.PgConnection pgConn) {
                         pgConn.notificationHandler(notification -> {
                             Log.debugf("Received notification: %s", notification.getPayload());
-                            triggerProcessing();
+                            // Hibernate Reactive requires a duplicated context flagged as "safe"
+                            io.vertx.core.impl.ContextInternal context = ((io.vertx.core.impl.ContextInternal) vertx
+                                    .getDelegate().getOrCreateContext()).duplicate();
+                            VertxContextSafetyToggle.setContextSafe(context, true);
+                            context.runOnContext(v -> triggerProcessing());
                         });
                     } else {
                         Log.warn("Connection is not a Postgres connection, cannot listen for notifications");
