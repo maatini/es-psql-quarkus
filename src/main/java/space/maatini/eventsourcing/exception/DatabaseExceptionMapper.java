@@ -1,5 +1,7 @@
 package space.maatini.eventsourcing.exception;
 
+import space.maatini.eventsourcing.dto.ErrorResponse;
+
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
@@ -18,16 +20,14 @@ public class DatabaseExceptionMapper implements ExceptionMapper<ConstraintViolat
     @Override
     public Response toResponse(ConstraintViolationException exception) {
         LOG.error("Database constraint violation", exception);
-        
+
         String message = "Database constraint violation";
         if (exception.getConstraintName() != null) {
             message = "Constraint violation: " + exception.getConstraintName();
         }
 
         return Response.status(Response.Status.CONFLICT)
-            .entity(new ErrorResponse("Database error", message))
-            .build();
+                .entity(new ErrorResponse("Database error", message))
+                .build();
     }
-
-    public record ErrorResponse(String error, String message) {}
 }

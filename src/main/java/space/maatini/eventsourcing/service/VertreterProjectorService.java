@@ -11,13 +11,14 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.hibernate.reactive.mutiny.Mutiny;
+import jakarta.enterprise.event.Observes;
+import io.quarkus.runtime.StartupEvent;
+import io.quarkus.runtime.ShutdownEvent;
+
 import io.vertx.mutiny.pgclient.PgConnection;
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.core.Vertx;
-import jakarta.enterprise.event.Observes;
-import io.quarkus.runtime.StartupEvent;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -28,25 +29,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ApplicationScoped
 public class VertreterProjectorService {
 
-    @Inject
-    Mutiny.SessionFactory sessionFactory;
+    private static final String EVENT_TYPE_PREFIX = "space.maatini.vertreter.";
+    private static final String EVENT_TYPE_CREATED = EVENT_TYPE_PREFIX + "created";
+    private static final String EVENT_TYPE_UPDATED = EVENT_TYPE_PREFIX + "updated";
+    private static final String EVENT_TYPE_DELETED = EVENT_TYPE_PREFIX + "deleted";
 
-    @Inject
-    PgPool pgPool;
+    private static final int BATCH_SIZE = 50;
+    private static final long STARTUP_DELAY_MS = 2000;
+    private static final long RECONNECT_DELAY_MS = 5000;
+    private static final long YIELD_DELAY_MS = 10;
 
-    @Inject
-    Vertx vertx;
+    private final PgPool pgPool;
+    private final Vertx vertx;
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
     private volatile PgConnection listeningConnection;
 
-    public void onStart(@Observes StartupEvent ev) {
-        // Delay listener start to let Hibernate/Panache warm up pool
-        vertx.setTimer(2000, id -> listenForNotifications());
+    public VertreterProjectorService(PgPool pgPool, Vertx vertx) {
+        this.pgPool = pgPool;
+        this.vertx = vertx;
     }
 
-    public void onStop(@Observes io.quarkus.runtime.ShutdownEvent ev) {
+    public void onStart(@Observes StartupEvent ev) {
+        // Delay listener start to let Hibernate/Panache warm up pool
+        vertx.setTimer(STARTUP_DELAY_MS, id -> listenForNotifications());
+    }
+
+    public void onStop(@Observes ShutdownEvent ev) {
         if (listeningConnection != null) {
             listeningConnection.close()
                     .subscribe().with(
@@ -76,12 +86,12 @@ public class VertreterProjectorService {
                         conn -> {
                             conn.closeHandler(() -> {
                                 Log.warn("Postgres connection closed. Reconnecting in 5s...");
-                                vertx.setTimer(5000, id -> listenForNotifications());
+                                vertx.setTimer(RECONNECT_DELAY_MS, id -> listenForNotifications());
                             });
                         },
                         failure -> {
                             Log.error("Failed to connect to Postgres. Retrying in 5s...", failure);
-                            vertx.setTimer(5000, id -> listenForNotifications());
+                            vertx.setTimer(RECONNECT_DELAY_MS, id -> listenForNotifications());
                         });
     }
 
@@ -100,11 +110,11 @@ public class VertreterProjectorService {
                             if (count > 0)
                                 Log.debugf("Processed %d events (reactive)", count);
 
-                            // If we processed a full batch (50) or a rerun was requested, schedule next run
+                            // If we processed a full batch or a rerun was requested, schedule next run.
                             // We use a small delay to yield the event loop and allow other requests to be
-                            // processed
-                            if (count == 50 || rerunRequested.compareAndSet(true, false)) {
-                                vertx.setTimer(10, id -> runProcessingChain());
+                            // processed.
+                            if (count == BATCH_SIZE || rerunRequested.compareAndSet(true, false)) {
+                                vertx.setTimer(YIELD_DELAY_MS, id -> runProcessingChain());
                             } else {
                                 isProcessing.set(false);
                             }
@@ -132,8 +142,7 @@ public class VertreterProjectorService {
 
     @WithTransaction
     public Uni<Integer> processBatch() {
-        // Process up to 50 events at a time
-        return CloudEvent.findUnprocessed(50)
+        return CloudEvent.findUnprocessed(BATCH_SIZE)
                 .chain(events -> {
                     if (events.isEmpty()) {
                         return Uni.createFrom().item(0);
@@ -148,31 +157,26 @@ public class VertreterProjectorService {
     }
 
     private Uni<Void> processEvent(CloudEvent event) {
-        if (!event.type.startsWith("space.maatini.vertreter.")) {
+        if (!event.getType().startsWith(EVENT_TYPE_PREFIX)) {
             return markAsProcessed(event);
         }
 
-        JsonObject data = event.data;
+        JsonObject data = event.getData();
         String id = data.getString("id");
 
         if (id == null) {
-            Log.warnf("Event %s has no ID in data payload, skipping", event.id);
+            Log.warnf("Event %s has no ID in data payload, skipping", event.getId());
             return markAsProcessed(event);
         }
 
-        Uni<Void> processingLogic;
-        switch (event.type) {
-            case "space.maatini.vertreter.created":
-            case "space.maatini.vertreter.updated":
-                processingLogic = applyUpsert(event, id, data);
-                break;
-            case "space.maatini.vertreter.deleted":
-                processingLogic = applyDelete(id);
-                break;
-            default:
-                Log.warnf("Unknown Vertreter event type: %s", event.type);
-                processingLogic = Uni.createFrom().voidItem();
-        }
+        Uni<Void> processingLogic = switch (event.getType()) {
+            case EVENT_TYPE_CREATED, EVENT_TYPE_UPDATED -> applyUpsert(event, id, data);
+            case EVENT_TYPE_DELETED -> applyDelete(id);
+            default -> {
+                Log.warnf("Unknown Vertreter event type: %s", event.getType());
+                yield Uni.createFrom().voidItem();
+            }
+        };
 
         return processingLogic.chain(() -> markAsProcessed(event));
     }
@@ -181,26 +185,26 @@ public class VertreterProjectorService {
         return VertreterAggregate.<VertreterAggregate>findById(id)
                 .chain(existing -> {
                     VertreterAggregate aggregate = existing != null ? existing : new VertreterAggregate();
-                    aggregate.id = id;
+                    aggregate.setId(id);
 
                     // Update fields if present in event data (Patch semantics)
                     if (data.containsKey("name"))
-                        aggregate.name = data.getString("name");
+                        aggregate.setName(data.getString("name"));
                     if (data.containsKey("email"))
-                        aggregate.email = data.getString("email");
+                        aggregate.setEmail(data.getString("email"));
 
                     // Handle nested vertretenePerson
                     JsonObject vp = data.getJsonObject("vertretenePerson");
                     if (vp != null) {
                         if (vp.containsKey("id"))
-                            aggregate.vertretenePersonId = vp.getString("id");
+                            aggregate.setVertretenePersonId(vp.getString("id"));
                         if (vp.containsKey("name"))
-                            aggregate.vertretenePersonName = vp.getString("name");
+                            aggregate.setVertretenePersonName(vp.getString("name"));
                     }
 
-                    aggregate.updatedAt = event.time != null ? event.time : OffsetDateTime.now();
-                    aggregate.eventId = event.id;
-                    aggregate.version = (aggregate.version == null ? 0 : aggregate.version) + 1;
+                    aggregate.setUpdatedAt(event.getTime() != null ? event.getTime() : OffsetDateTime.now());
+                    aggregate.setEventId(event.getId());
+                    aggregate.setVersion((aggregate.getVersion() == null ? 0 : aggregate.getVersion()) + 1);
 
                     return aggregate.persist();
                 })
@@ -212,7 +216,7 @@ public class VertreterProjectorService {
     }
 
     private Uni<Void> markAsProcessed(CloudEvent event) {
-        event.processedAt = OffsetDateTime.now();
-        return event.persist().replaceWithVoid(); // or update
+        event.setProcessedAt(OffsetDateTime.now());
+        return event.persist().replaceWithVoid();
     }
 }

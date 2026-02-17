@@ -70,52 +70,64 @@ curl http://localhost:8080/aggregates/vertreter/v001
 
 ## Architektur
 
+Das System setzt auf eine **Reactive Event Sourcing** Architektur mit asynchronen Java-Projektionen.
+
+```mermaid
+graph TD
+    subgraph "Write Side (Command)"
+        API_W[REST API<br/>(EventResource)] -->|POST /events| ES[EventService]
+        ES -->|INSERT| DB_Events[(PostgreSQL<br/>events table)]
+    end
+
+    subgraph "Database Layer"
+        DB_Events -->|TRIGGER (After Insert)| DB_Notify[NOTIFY events_channel]
+        DB_Events -.->|SELECT Unprocessed| PROJ
+        PROJ -->|UPSERT| DB_Agg[(PostgreSQL<br/>vertreter_aggregate)]
+    end
+
+    subgraph "Async Projection (Java)"
+        DB_Notify -.->|LISTEN| PROJ[VertreterProjectorService]
+        PROJ -->|Logic / Apply Event| PROJ
+    end
+
+    subgraph "Read Side (Query)"
+        API_R[REST API<br/>(VertreterAggregateResource)] -->|GET /aggregates| AS[VertreterAggregateService]
+        AS -->|SELECT| DB_Agg
+    end
+
+    classDef java fill:#2C3E50,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#27AE60,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef api fill:#E67E22,stroke:#fff,stroke-width:2px,color:#fff;
+
+    class API_W,API_R,ES,AS,PROJ java;
+    class DB_Events,DB_Agg,DB_Notify db;
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐
-│ REST API    │────▶│ EventService│────▶│ events (PostgreSQL) │
-└─────────────┘     └─────────────┘     └──────────┬──────────┘
-                                                    │ Trigger
-                                                    ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐
-│ REST API    │◀────│ AggService  │◀────│ vertreter_aggregate │
-└─────────────┘     └─────────────┘     └─────────────────────┘
-```
+
+### Komponenten
+
+1.  **Event Ingestion**: Events werden per REST empfangen und idempotenz-sicher in die `events`-Tabelle geschrieben.
+2.  **Notification**: Ein minimaler PostgreSQL-Trigger sendet ein `NOTIFY`-Signal, sobald ein neues Event eingefügt wird.
+3.  **Async Projection (Java)**: Der `VertreterProjectorService` lauscht auf diesen Kanal (Reactive PostgreSQL Client), lädt unverarbeitete Events, wendet die Geschäftslogik an und aktualisiert das Read-Model (`vertreter_aggregate`).
+4.  **Query**: Abfragen lesen ausschließlich vom optimierten Read-Model.
 
 ## Anwendungsfälle
 
-Dieser Architektur-Ansatz eignet sich besonders für:
+Dieser Architektur-Ansatz bietet:
 
-*   **Revisionssicherheit (Audit-Log)**: Vollständige Historie aller Änderungen (wer, wann, was), unverzichtbar für Compliance-kritische Bereiche (z.B. Vertreter-Vollmachten).
-*   **High-Performance CQRS**: Trennung von Schreib- (Events) und Leselast (Aggregates). Das Lesemodell kann für spezifische UI-Anforderungen optimiert werden.
-*   **Zeitpunkt-Bezogene Abfragen**: Möglichkeit, den Zustand des Systems zu jedem beliebigen Zeitpunkt in der Vergangenheit zu rekonstruieren ("Time Travel").
-*   **Entkopplung**: Andere Services können asynchron auf Events reagieren (z.B. per Kafka-Connect auf die `events`-Tabelle), ohne die interne Logik zu kennen.
-
-## Dynamische Aggregation
-
-Die Aggregationslogik befindet sich in PostgreSQL (`aggregate_vertreter()` Funktion).
-Um die Logik zu ändern, SQL ausführen:
-
-```sql
-CREATE OR REPLACE FUNCTION aggregate_vertreter() ...
-```
-
-**Kein Redeployment der Anwendung nötig!**
+*   **Near-Realtime Updates**: Durch `LISTEN/NOTIFY` reagiert das System millisekundenschnell auf neue Events, ohne Polling-Overhead.
+*   **Revisionssicherheit**: Unveränderlicher Audit-Log aller Änderungen in der `events`-Tabelle.
+*   **Performance**: Trennung von Schreib- (Events) und Leselast (Aggregates).
+*   **Flexibilität**: Die Projektionslogik ist in Java implementiert und kann komplexe Regeln abbilden, externe Services aufrufen oder E-Mails versenden.
+*   **Reply-Fähigkeit**: Durch Löschen des Read-Models und Zurücksetzen des `processed_at`-Status kann die gesamte Datenbank aus den Events neu aufgebaut werden.
 
 ## Event-Verarbeitung
 
 ### Verarbeitungsreihenfolge
-Events werden in der **Einfügereihenfolge** verarbeitet (PostgreSQL-Garantie durch synchronen Trigger).
+Events werden sequenziell anhand ihres Zeitstempels (`created_at`) verarbeitet, um Konsistenz zu garantieren.
 
-### Verarbeitungsstatus
-Jedes Event hat ein `processed_at` Feld:
-- `NULL` = Noch nicht verarbeitet
-- Timestamp = Zeitpunkt der Verarbeitung
+### Fehlerbehandlung & Idempotenz
+Der Projektor speichert den Fortschritt in der `events`-Tabelle (`processed_at`). Startet der Service neu, setzt er automatisch an der letzten Position fort.
 
-### Automatischer Replay
-Bei Neustart des Services werden unverarbeitete Events automatisch nachverarbeitet:
-```sql
-SELECT replay_unprocessed_events();
-```
 
 ## Tests
 

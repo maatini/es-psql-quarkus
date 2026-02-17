@@ -1,6 +1,7 @@
 package space.maatini.eventsourcing.entity;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
@@ -20,25 +21,93 @@ import jakarta.persistence.Table;
 public class VertreterAggregate extends PanacheEntityBase {
 
     @Id
-    public String id;
+    private String id;
 
-    public String name;
+    private String name;
 
-    public String email;
+    private String email;
 
     @Column(name = "vertretene_person_id")
-    public String vertretenePersonId;
+    private String vertretenePersonId;
 
     @Column(name = "vertretene_person_name")
-    public String vertretenePersonName;
+    private String vertretenePersonName;
 
     @Column(name = "updated_at")
-    public OffsetDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 
     @Column(name = "event_id")
-    public UUID eventId;
+    private UUID eventId;
 
-    public Integer version;
+    private Integer version;
+
+    // --- Getters & Setters ---
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getVertretenePersonId() {
+        return vertretenePersonId;
+    }
+
+    public void setVertretenePersonId(String vertretenePersonId) {
+        this.vertretenePersonId = vertretenePersonId;
+    }
+
+    public String getVertretenePersonName() {
+        return vertretenePersonName;
+    }
+
+    public void setVertretenePersonName(String vertretenePersonName) {
+        this.vertretenePersonName = vertretenePersonName;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public UUID getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(UUID eventId) {
+        this.eventId = eventId;
+    }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;
+    }
+
+    // --- Static query methods ---
 
     /**
      * Find Vertreter by ID.
@@ -50,7 +119,7 @@ public class VertreterAggregate extends PanacheEntityBase {
     /**
      * Find all Vertreter, ordered by name.
      */
-    public static Uni<java.util.List<VertreterAggregate>> findAllOrderedByName() {
+    public static Uni<List<VertreterAggregate>> findAllOrderedByName() {
         return list("ORDER BY name ASC");
     }
 
@@ -64,7 +133,7 @@ public class VertreterAggregate extends PanacheEntityBase {
     /**
      * Find Vertreter by vertretene person ID.
      */
-    public static Uni<java.util.List<VertreterAggregate>> findByVertretenePersonId(String id) {
+    public static Uni<List<VertreterAggregate>> findByVertretenePersonId(String id) {
         return list("vertretenePersonId", id);
     }
 }

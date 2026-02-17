@@ -9,19 +9,22 @@ import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import org.jboss.logging.Logger;
 
 /**
  * Service for storing and retrieving CloudEvents.
- * The aggregation is handled by PostgreSQL triggers, not this service.
+ * The aggregation is handled by the VertreterProjectorService, not this
+ * service.
  */
 @ApplicationScoped
 public class EventService {
 
-    @Inject
-    Logger log;
+    private final Logger log;
+
+    public EventService(Logger log) {
+        this.log = log;
+    }
 
     /**
      * Store a new event. Idempotent - returns existing event if already stored.
@@ -33,39 +36,39 @@ public class EventService {
     public Uni<EventResult> storeEvent(CloudEventDTO dto) {
         // Apply defaults
         CloudEventDTO event = dto.withDefaults();
-        
+
         log.debugf("Storing event: id=%s, type=%s, subject=%s", event.id(), event.type(), event.subject());
-        
+
         // Check for idempotency - if event already exists, return it
-        return CloudEvent.findById(event.id())
-            .flatMap(existing -> {
-                if (existing != null) {
-                    log.infof("Event %s already exists, returning existing (idempotent)", event.id());
-                    return Uni.createFrom().item(new EventResult((CloudEvent) existing, true));
-                }
-                
-                // Convert Map to JsonObject for JSONB storage
-                JsonObject dataJson = new JsonObject(event.data());
-                
-                // Create new event entity
-                CloudEvent entity = new CloudEvent();
-                entity.id = event.id();
-                entity.source = event.source();
-                entity.specversion = event.specversion();
-                entity.type = event.type();
-                entity.subject = event.subject();
-                entity.time = event.time();
-                entity.datacontenttype = event.datacontenttype();
-                entity.dataschema = event.dataschema();
-                entity.data = dataJson;
-                
-                // Persist - the PostgreSQL trigger will handle aggregation
-                return entity.persist()
-                    .map(persisted -> {
-                        log.infof("Event %s stored successfully, type=%s", event.id(), event.type());
-                        return new EventResult((CloudEvent) persisted, false);
-                    });
-            });
+        return CloudEvent.<CloudEvent>findById(event.id())
+                .flatMap(existing -> {
+                    if (existing != null) {
+                        log.infof("Event %s already exists, returning existing (idempotent)", event.id());
+                        return Uni.createFrom().item(new EventResult(existing, true));
+                    }
+
+                    // Convert Map to JsonObject for JSONB storage
+                    JsonObject dataJson = new JsonObject(event.data());
+
+                    // Create new event entity
+                    CloudEvent entity = new CloudEvent();
+                    entity.setId(event.id());
+                    entity.setSource(event.source());
+                    entity.setSpecversion(event.specversion());
+                    entity.setType(event.type());
+                    entity.setSubject(event.subject());
+                    entity.setTime(event.time());
+                    entity.setDatacontenttype(event.datacontenttype());
+                    entity.setDataschema(event.dataschema());
+                    entity.setData(dataJson);
+
+                    // Persist - the projector service will handle aggregation
+                    return entity.<CloudEvent>persist()
+                            .map(persisted -> {
+                                log.infof("Event %s stored successfully, type=%s", event.id(), event.type());
+                                return new EventResult(persisted, false);
+                            });
+                });
     }
 
     /**
@@ -92,5 +95,6 @@ public class EventService {
     /**
      * Result of storing an event.
      */
-    public record EventResult(CloudEvent event, boolean alreadyExisted) {}
+    public record EventResult(CloudEvent event, boolean alreadyExisted) {
+    }
 }

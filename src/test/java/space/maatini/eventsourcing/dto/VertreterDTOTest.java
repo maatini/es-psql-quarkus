@@ -19,14 +19,14 @@ class VertreterDTOTest {
     void fromMapsAllFields() {
         // Given
         VertreterAggregate entity = new VertreterAggregate();
-        entity.id = "v001";
-        entity.name = "Test Name";
-        entity.email = "test@example.com";
-        entity.vertretenePersonId = "p001";
-        entity.vertretenePersonName = "Erika Musterfrau";
-        entity.updatedAt = OffsetDateTime.now();
-        entity.eventId = UUID.randomUUID();
-        entity.version = 5;
+        entity.setId("v001");
+        entity.setName("Test Name");
+        entity.setEmail("test@example.com");
+        entity.setVertretenePersonId("p001");
+        entity.setVertretenePersonName("Erika Musterfrau");
+        entity.setUpdatedAt(OffsetDateTime.now());
+        entity.setEventId(UUID.randomUUID());
+        entity.setVersion(5);
 
         // When
         VertreterDTO dto = VertreterDTO.from(entity);
@@ -38,8 +38,8 @@ class VertreterDTOTest {
         assertNotNull(dto.vertretenePerson());
         assertEquals("p001", dto.vertretenePerson().id());
         assertEquals("Erika Musterfrau", dto.vertretenePerson().name());
-        assertEquals(entity.updatedAt, dto.updatedAt());
-        assertEquals(entity.eventId, dto.lastEventId());
+        assertEquals(entity.getUpdatedAt(), dto.updatedAt());
+        assertEquals(entity.getEventId(), dto.lastEventId());
         assertEquals(5, dto.version());
     }
 
@@ -48,21 +48,21 @@ class VertreterDTOTest {
     void fromHandlesNullVertetenePerson() {
         // Given
         VertreterAggregate entity = new VertreterAggregate();
-        entity.id = "v002";
-        entity.name = "Name Only";
-        entity.email = "name@example.com";
-        entity.vertretenePersonId = null;  // No represented person
-        entity.vertretenePersonName = null;
-        entity.updatedAt = OffsetDateTime.now();
-        entity.eventId = UUID.randomUUID();
-        entity.version = 1;
+        entity.setId("v002");
+        entity.setName("Name Only");
+        entity.setEmail("name@example.com");
+        entity.setVertretenePersonId(null); // No represented person
+        entity.setVertretenePersonName(null);
+        entity.setUpdatedAt(OffsetDateTime.now());
+        entity.setEventId(UUID.randomUUID());
+        entity.setVersion(1);
 
         // When
         VertreterDTO dto = VertreterDTO.from(entity);
 
         // Then
         assertEquals("v002", dto.id());
-        assertNull(dto.vertretenePerson());  // Should be null
+        assertNull(dto.vertretenePerson()); // Should be null
     }
 
     @Test
@@ -70,14 +70,14 @@ class VertreterDTOTest {
     void fromHandlesNullFields() {
         // Given
         VertreterAggregate entity = new VertreterAggregate();
-        entity.id = "v003";
-        entity.name = null;
-        entity.email = null;
-        entity.vertretenePersonId = null;
-        entity.vertretenePersonName = null;
-        entity.updatedAt = null;
-        entity.eventId = null;
-        entity.version = null;
+        entity.setId("v003");
+        entity.setName(null);
+        entity.setEmail(null);
+        entity.setVertretenePersonId(null);
+        entity.setVertretenePersonName(null);
+        entity.setUpdatedAt(null);
+        entity.setEventId(null);
+        entity.setVersion(null);
 
         // When
         VertreterDTO dto = VertreterDTO.from(entity);
