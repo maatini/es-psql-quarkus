@@ -75,24 +75,24 @@ Das System setzt auf eine **Reactive Event Sourcing** Architektur mit asynchrone
 ```mermaid
 graph TD
     subgraph "Write Side (Command)"
-        API_W["REST API<br/>(EventResource)"] -->|POST /events| ES[EventService]
-        ES -->|INSERT| DB_Events[("PostgreSQL<br/>events table")]
+        API_W["REST API<br/>(EventResource)"] -->|"POST /events"| ES["EventService"]
+        ES -->|"INSERT"| DB_Events[("PostgreSQL<br/>events table")]
     end
 
     subgraph "Database Layer"
-        DB_Events -->|TRIGGER (After Insert)| DB_Notify[NOTIFY events_channel]
-        DB_Events -.->|SELECT Unprocessed| PROJ
-        PROJ -->|UPSERT| DB_Agg[("PostgreSQL<br/>vertreter_aggregate")]
+        DB_Events -->|"TRIGGER (After Insert)"| DB_Notify["NOTIFY events_channel"]
+        DB_Events -.->|"SELECT Unprocessed"| PROJ
+        PROJ -->|"UPSERT"| DB_Agg[("PostgreSQL<br/>vertreter_aggregate")]
     end
 
     subgraph "Async Projection (Java)"
-        DB_Notify -.->|LISTEN| PROJ[VertreterProjectorService]
-        PROJ -->|Logic / Apply Event| PROJ
+        DB_Notify -.->|"LISTEN"| PROJ["VertreterProjectorService"]
+        PROJ -->|"Logic / Apply Event"| PROJ
     end
 
     subgraph "Read Side (Query)"
-        API_R["REST API<br/>(VertreterAggregateResource)"] -->|GET /aggregates| AS[VertreterAggregateService]
-        AS -->|SELECT| DB_Agg
+        API_R["REST API<br/>(VertreterAggregateResource)"] -->|"GET /aggregates"| AS["VertreterAggregateService"]
+        AS -->|"SELECT"| DB_Agg
     end
 
     classDef java fill:#2C3E50,stroke:#fff,stroke-width:2px,color:#fff;
