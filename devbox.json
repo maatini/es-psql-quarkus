@@ -8,7 +8,6 @@
     "k6@latest"
   ],
   "env": {
-    "JAVA_HOME":  "$DEVBOX_PACKAGES_DIR/lib/openjdk",
     "PGDATA":     "$PWD/.devbox/pgdata",
     "PGHOST":     "localhost",
     "PGPORT":     "5432",
