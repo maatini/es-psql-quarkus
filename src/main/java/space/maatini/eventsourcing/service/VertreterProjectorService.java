@@ -79,7 +79,7 @@ public class VertreterProjectorService {
                             io.vertx.core.impl.ContextInternal context = ((io.vertx.core.impl.ContextInternal) vertx
                                     .getDelegate().getOrCreateContext()).duplicate();
                             VertxContextSafetyToggle.setContextSafe(context, true);
-                            context.runOnContext(v -> triggerProcessing());
+                            context.runOnContext(v -> triggerBackgroundProcessing());
                         });
                     } else {
                         Log.warn("Connection is not a Postgres connection, cannot listen for notifications");
@@ -103,11 +103,30 @@ public class VertreterProjectorService {
                         });
     }
 
-    private void triggerProcessing() {
+    private void triggerBackgroundProcessing() {
         if (isProcessing.compareAndSet(false, true)) {
             runProcessingChain();
         } else {
             rerunRequested.set(true);
+        }
+    }
+
+    /**
+     * Manual trigger for a single batch, respects the processing lock.
+     * If already processing, it waits and retries to ensure a deterministic result
+     * for the caller (tests).
+     */
+    public Uni<Integer> triggerManualBatch() {
+        if (isProcessing.compareAndSet(false, true)) {
+            return processBatch()
+                    .onTermination().invoke(() -> isProcessing.set(false));
+        } else {
+            // Busy, poll-and-retry on Vert.x EventLoop
+            return Uni.createFrom().emitter(emitter -> {
+                vertx.setTimer(100, id -> {
+                    triggerManualBatch().subscribe().with(emitter::complete, emitter::fail);
+                });
+            });
         }
     }
 
@@ -131,7 +150,7 @@ public class VertreterProjectorService {
     }
 
     @WithTransaction
-    public Uni<Integer> processBatch() {
+    protected Uni<Integer> processBatch() {
         return CloudEvent.findUnprocessed(BATCH_SIZE)
                 .chain(events -> {
                     if (events.isEmpty()) {

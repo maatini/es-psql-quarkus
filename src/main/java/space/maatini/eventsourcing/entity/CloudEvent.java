@@ -172,8 +172,13 @@ public class CloudEvent extends PanacheEntityBase {
     /**
      * Find unprocessed events older than now, ordered by creation time.
      * Limit the result size to avoid OOM.
+     * Uses PESSIMISTIC_WRITE with SKIP LOCKED to prevent multiple threads from
+     * processing the same events.
      */
     public static Uni<List<CloudEvent>> findUnprocessed(int limit) {
-        return find("processedAt IS NULL ORDER BY createdAt ASC").page(0, limit).list();
+        return find("processedAt IS NULL ORDER BY createdAt ASC")
+                .withLock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+                .page(0, limit)
+                .list();
     }
 }

@@ -32,7 +32,7 @@ public class AdminResource {
     @Path("/projection/trigger")
     @Operation(summary = "Manually trigger projection", description = "Triggers the processing of unprocessed events (useful for testing or after manual DB changes)")
     public Uni<Response> triggerProjection() {
-        return projectorService.processBatch()
+        return projectorService.triggerManualBatch()
                 .map(count -> Response.ok(new ProjectionResult(count)).build());
     }
 
