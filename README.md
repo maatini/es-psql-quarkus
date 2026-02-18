@@ -100,27 +100,93 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 - Umfassende Test-Suite (60+ Tests für Edge-Cases, Handler & Replay) + k6-Loadtests
 - Devbox-Komplettumgebung
 
-## Erweiterung um neue Event-Typen / Aggregate (neu & generisch)
+## Erweiterung um neue Event-Typen / Aggregate
 
-**Schritt 1:** Aggregate Entity erstellen (muss `AggregateRoot` implementieren)
+Wenn du ein neues Thema (Aggregate) hinzufügen möchtest (z.B. "Abwesenheiten"), folge diesen drei einfachen Schritten:
 
-**Schritt 2:** Neuen Handler erstellen
+### Schritt 1: Das Read-Model erstellen (Die Datenbank-Tabelle)
+
+Erstelle eine Java-Klasse für dein neues Aggregat. Diese Klasse stellt den aktuellen Zustand in der Datenbank dar.
+
+1.  **Pfad:** `src/main/java/space/maatini/eventsourcing/entity/`
+2.  **Anforderungen:** 
+    - Nutze `@Entity` und `@Table`.
+    - Erweitere `PanacheEntityBase` (für einfachen DB-Zugriff).
+    - Implementiere das Interface `AggregateRoot`.
+3.  **Wichtige Felder:** Dein Aggregat braucht zwingend `eventId`, `version` und `updatedAt`, damit das System weiß, auf welchem Stand die Daten sind.
+
+**Beispiel:**
+```java
+@Entity
+@Table(name = "abwesenheit_aggregate")
+public class AbwesenheitAggregate extends PanacheEntityBase implements AggregateRoot {
+    @Id
+    public String id;
+    public String grund;
+    
+    // Pflichtfelder für das Event-Sourcing
+    public UUID eventId;
+    public Integer version;
+    public OffsetDateTime updatedAt;
+}
+```
+
+### Schritt 2: Den Handler erstellen (Die Logik)
+
+Der Handler entscheidet, was passiert, wenn ein neues Event eintrifft. Er liest das Event und aktualisiert die Tabelle aus Schritt 1.
+
+1.  **Pfad:** `src/main/java/space/maatini/eventsourcing/service/`
+2.  **Anforderungen:**
+    - Nutze `@ApplicationScoped`.
+    - Nutze `@HandlesEvents` um zu definieren, auf welche Events (Präfix) dieser Handler reagiert.
+    - Implementiere `AggregateEventHandler<DeinAggregat>`.
+
+**Beispiel:**
 ```java
 @ApplicationScoped
 @HandlesEvents(value = "space.maatini.abwesenheit.", aggregate = AbwesenheitAggregate.class)
 public class AbwesenheitHandler implements AggregateEventHandler<AbwesenheitAggregate> {
+
     @Override
     public boolean canHandle(String eventType) {
+        // Reagiere z.B. auf "created" und "updated"
         return eventType.startsWith("space.maatini.abwesenheit.");
     }
 
     @Override
-    public Uni<Void> handle(CloudEvent event) { ... }
+    public Uni<Void> handle(CloudEvent event) {
+        JsonObject data = event.getData();
+        String id = data.getString("id");
+
+        // 1. Bestehendes Aggregat suchen oder neues erstellen
+        return AbwesenheitAggregate.<AbwesenheitAggregate>findById(id)
+            .chain(existing -> {
+                AbwesenheitAggregate agg = existing != null ? existing : new AbwesenheitAggregate();
+                agg.id = id;
+                
+                // 2. Daten aus dem Event übernehmen
+                agg.grund = data.getString("grund");
+                
+                // 3. Metadaten setzen (Pflicht)
+                agg.updatedAt = event.getTime();
+                agg.eventId = event.getId();
+                agg.version = (agg.version == null ? 0 : agg.version) + 1;
+
+                // 4. Speichern
+                return agg.persist();
+            }).replaceWithVoid();
+    }
 }
 ```
 
-**Schritt 3:** DTO, Service und Resource hinzufügen (optional)
-**Fertig.** Die `ProjectionService` registriert den neuen Handler automatisch.
+### Schritt 3: API & Service (Die Abfrage)
+
+Damit du die Daten auch wieder auslesen kannst, erstellst du wie gewohnt eine Resource (REST-Schnittstelle).
+
+1.  **Service:** Erstelle einen Service, der die Daten aus der `abwesenheit_aggregate` Tabelle abfragt.
+2.  **Resource:** Erstelle einen Controller, der z.B. unter `/aggregates/abwesenheit` erreichbar ist.
+
+**Das war's!** Der `ProjectionService` erkennt deinen neuen Handler automatisch beim Start der Anwendung. Du musst nichts manuell registrieren.
 
 ## Tests & Benchmarks
 
