@@ -136,4 +136,8 @@ public class VertreterAggregate extends PanacheEntityBase implements AggregateRo
     public static Uni<List<VertreterAggregate>> findByVertretenePersonId(String id) {
         return list("vertretenePersonId", id);
     }
+
+    public static String getTableName() {
+        return "vertreter_aggregate";
+    }
 }

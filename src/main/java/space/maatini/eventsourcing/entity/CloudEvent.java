@@ -56,6 +56,15 @@ public class CloudEvent extends PanacheEntityBase {
     @Column(name = "processed_at")
     private OffsetDateTime processedAt;
 
+    @Column(name = "failed_at")
+    private OffsetDateTime failedAt;
+
+    @Column(name = "retry_count", nullable = false)
+    private Integer retryCount = 0;
+
+    @Column(name = "error_message", columnDefinition = "text")
+    private String errorMessage;
+
     // --- Getters & Setters ---
 
     public UUID getId() {
@@ -146,6 +155,30 @@ public class CloudEvent extends PanacheEntityBase {
         this.processedAt = processedAt;
     }
 
+    public OffsetDateTime getFailedAt() {
+        return failedAt;
+    }
+
+    public void setFailedAt(OffsetDateTime failedAt) {
+        this.failedAt = failedAt;
+    }
+
+    public Integer getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(Integer retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
     // --- Static query methods ---
 
     /**
@@ -169,16 +202,15 @@ public class CloudEvent extends PanacheEntityBase {
         return list("subject = ?1 ORDER BY time ASC", subject);
     }
 
-    /**
-     * Find unprocessed events older than now, ordered by creation time.
-     * Limit the result size to avoid OOM.
-     * Uses PESSIMISTIC_WRITE with SKIP LOCKED to prevent multiple threads from
-     * processing the same events.
-     */
     public static Uni<List<CloudEvent>> findUnprocessed(int limit) {
-        return find("processedAt IS NULL ORDER BY createdAt ASC")
-                .withLock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-                .page(0, limit)
-                .list();
+        // We use a native query here to ensure FOR UPDATE SKIP LOCKED is used correctly
+        // for multi-instance safety.
+        // In Hibernate Reactive Panache, we can use getSession() to execute a native
+        // query.
+        return getSession().chain(session -> session.createNativeQuery(
+                "SELECT * FROM events WHERE processed_at IS NULL AND retry_count < 5 ORDER BY created_at ASC FOR UPDATE SKIP LOCKED",
+                CloudEvent.class)
+                .setMaxResults(limit)
+                .getResultList());
     }
 }

@@ -13,4 +13,12 @@ public interface AggregateRoot {
     static Uni<Long> deleteAll() {
         throw new UnsupportedOperationException("Subclasses must implement static deleteAll()");
     }
+
+    /**
+     * Returns the table name for this aggregate.
+     * Used for generic SQL operations.
+     */
+    static String getTableName() {
+        throw new UnsupportedOperationException("Subclasses must implement static getTableName()");
+    }
 }

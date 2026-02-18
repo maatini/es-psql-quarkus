@@ -1,7 +1,6 @@
 package space.maatini.eventsourcing.service;
 
 import space.maatini.eventsourcing.entity.CloudEvent;
-import space.maatini.eventsourcing.entity.VertreterAggregate;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
@@ -37,6 +36,7 @@ public class ProjectionService {
     private final PgPool pgPool;
     private final Vertx vertx;
     private final java.util.Map<String, java.util.List<EventHandler>> handlerRegistry = new java.util.HashMap<>();
+    private final java.util.Set<Class<? extends space.maatini.eventsourcing.entity.AggregateRoot>> aggregateClasses = new java.util.HashSet<>();
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
@@ -53,6 +53,7 @@ public class ProjectionService {
             if (annotation != null) {
                 String prefix = annotation.value();
                 handlerRegistry.computeIfAbsent(prefix, k -> new java.util.ArrayList<>()).add(handler);
+                aggregateClasses.add(annotation.aggregate());
             }
         });
     }
@@ -178,8 +179,17 @@ public class ProjectionService {
                 .filter(h -> h.canHandle(eventType))
                 .findFirst()
                 .map(handler -> handler.handle(event)
-                        .chain(() -> markAsProcessed(event)))
+                        .chain(() -> markAsProcessed(event))
+                        .onFailure().recoverWithUni(t -> handleFailure(event, t)))
                 .orElseGet(() -> markAsProcessed(event));
+    }
+
+    private Uni<Void> handleFailure(CloudEvent event, Throwable t) {
+        Log.errorf(t, "Failed to process event %s (%s)", event.getId(), event.getType());
+        event.setFailedAt(OffsetDateTime.now());
+        event.setRetryCount((event.getRetryCount() == null ? 0 : event.getRetryCount()) + 1);
+        event.setErrorMessage(t.getMessage());
+        return event.persist().replaceWithVoid();
     }
 
     private Uni<Void> markAsProcessed(CloudEvent event) {
@@ -193,24 +203,35 @@ public class ProjectionService {
      */
     @WithTransaction
     public Uni<Integer> replayAll(UUID fromEventId) {
-        // In a fully generic version, we'd iterate over all managed aggregates.
-        // For now, we still target the template's primary aggregate.
-        return VertreterAggregate.deleteAll()
+        Log.info("Initiating generic replay for all registered aggregates");
+
+        // Delete all data from all known aggregates
+        Uni<Void> deleteAggregates = Multi.createFrom().iterable(aggregateClasses)
+                .onItem().<Void>transformToUniAndConcatenate(clazz -> {
+                    // Using Session to delete all records for the given entity class
+                    return space.maatini.eventsourcing.entity.CloudEvent.getSession()
+                            .chain(session -> session.createQuery("DELETE FROM " + clazz.getSimpleName())
+                                    .executeUpdate())
+                            .replaceWithVoid();
+                })
+                .collect().last().onFailure().recoverWithItem((Void) null);
+
+        return deleteAggregates
                 .chain(() -> {
                     if (fromEventId != null) {
-                        // Find the event's createdAt, then reset all events from that point
                         return CloudEvent.<CloudEvent>findById(fromEventId)
                                 .chain(refEvent -> {
                                     if (refEvent == null) {
-                                        // Event not found – reset all
-                                        return CloudEvent.update("UPDATE CloudEvent SET processedAt = null");
+                                        return CloudEvent.update(
+                                                "UPDATE CloudEvent SET processedAt = null, failedAt = null, retryCount = 0, errorMessage = null");
                                     }
                                     return CloudEvent.update(
-                                            "UPDATE CloudEvent SET processedAt = null WHERE createdAt >= ?1",
+                                            "UPDATE CloudEvent SET processedAt = null, failedAt = null, retryCount = 0, errorMessage = null WHERE createdAt >= ?1",
                                             refEvent.getCreatedAt());
                                 });
                     } else {
-                        return CloudEvent.update("UPDATE CloudEvent SET processedAt = null");
+                        return CloudEvent.update(
+                                "UPDATE CloudEvent SET processedAt = null, failedAt = null, retryCount = 0, errorMessage = null");
                     }
                 })
                 .invoke(count -> Log.infof("Replay initiated: reset %d events for re-processing", count));
