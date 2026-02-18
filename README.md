@@ -18,8 +18,8 @@ graph TD
     end
 
     subgraph "Async Projection (Java)"
-        DB_Notify -->|"LISTEN"| PROJ["VertreterProjectorService<br/>+ Handler Registry"]
-        PROJ -->|"Handler Pattern"| DB_Agg[("PostgreSQL<br/>vertreter_aggregate")]
+        DB_Notify -->|"LISTEN"| PROJ["ProjectionService<br/>+ Handler Registry"]
+        PROJ -->|"Handler Pattern"| DB_Agg[("PostgreSQL<br/>Aggregate Tables")]
     end
 
     subgraph "Read Side (Query)"
@@ -86,8 +86,8 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 
 1. **Event Ingestion** – Idempotente Speicherung von CloudEvents
 2. **Notification** – Minimaler PostgreSQL NOTIFY-Trigger
-3. **Projection** – `VertreterProjectorService` mit Handler-Registry (skalierbar)
-4. **Read Model** – Optimierte Aggregate-Tabelle
+3. **Projection** – `ProjectionService` mit generischer Handler-Registry (skalierbar)
+4. **Read Model** – Optimierte Aggregate-Tabellen (implementieren `AggregateRoot`)
 
 ## Features
 
@@ -100,12 +100,15 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 - Umfassende Test-Suite (60+ Tests für Edge-Cases, Handler & Replay) + k6-Loadtests
 - Devbox-Komplettumgebung
 
-## Erweiterung um neue Event-Typen (neu & einfach)
+## Erweiterung um neue Event-Typen / Aggregate (neu & generisch)
 
-**Schritt 1:** Neuen Handler erstellen  
+**Schritt 1:** Aggregate Entity erstellen (muss `AggregateRoot` implementieren)
+
+**Schritt 2:** Neuen Handler erstellen
 ```java
 @ApplicationScoped
-public class AbwesenheitHandler implements VertreterEventHandler {
+@HandlesEvents(value = "space.maatini.abwesenheit.", aggregate = AbwesenheitAggregate.class)
+public class AbwesenheitHandler implements AggregateEventHandler<AbwesenheitAggregate> {
     @Override
     public boolean canHandle(String eventType) {
         return eventType.startsWith("space.maatini.abwesenheit.");
@@ -116,8 +119,8 @@ public class AbwesenheitHandler implements VertreterEventHandler {
 }
 ```
 
-**Schritt 2:** DTO, Entity, Service und Resource (wie beim Vertreter)  
-**Fertig.** Kein SQL, kein Redeployment nötig für die Projection.
+**Schritt 3:** DTO, Service und Resource hinzufügen (optional)
+**Fertig.** Die `ProjectionService` registriert den neuen Handler automatisch.
 
 ## Tests & Benchmarks
 
