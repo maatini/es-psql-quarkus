@@ -48,7 +48,7 @@ public class CloudEvent extends PanacheEntityBase {
 
     @Column(nullable = false, columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
-    private JsonObject data;
+    private java.util.Map<String, Object> data;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -132,11 +132,11 @@ public class CloudEvent extends PanacheEntityBase {
     }
 
     public JsonObject getData() {
-        return data;
+        return data != null ? new JsonObject(data) : null;
     }
 
     public void setData(JsonObject data) {
-        this.data = data;
+        this.data = data != null ? data.getMap() : null;
     }
 
     public OffsetDateTime getCreatedAt() {

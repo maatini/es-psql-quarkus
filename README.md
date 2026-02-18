@@ -76,11 +76,13 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 | `GET`  | `/aggregates/vertreter/count`     | Anzahl Vertreter                 |
 | `GET`  | `/aggregates/vertreter/vertretene-person/{id}` | Vertreter einer Person |
 
-### Admin (neu)
-| Method | Path                     | Beschreibung                     |
-|--------|--------------------------|----------------------------------|
-| `POST` | `/admin/projection/trigger` | Projection manuell triggern   |
-| `POST` | `/admin/replay`          | Replay (optional `?fromEventId=UUID`) |
+### Admin & Ops
+| Method | Path                       | Beschreibung                     |
+|--------|----------------------------|----------------------------------|
+| `POST` | `/admin/projection/trigger` | Projection manuell triggern      |
+| `POST` | `/admin/replay`             | Replay (optional `?fromEventId=UUID`) |
+| `GET`  | `/q/health`                 | Health Status (ink. Projection-Lag) |
+| `GET`  | `/q/metrics`                | Prometheus Metriken              |
 
 ## Architektur-Komponenten
 
@@ -96,7 +98,9 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 - Write/Read-Separation (CQRS)
 - Handler-Pattern für einfache Erweiterbarkeit
 - Replay-Fähigkeit (kompletter Neuaufbau des Read-Models)
-- Micrometer-Metriken (Projection-Lag, Errors, Processed-Events)
+- **Robustes Error Handling**: Automatischer Retry & Dead-Letter-Logik (v1.1)
+- **Monitoring**: Micrometer-Prometheus Metriken & Custom HealthChecks (v1.1)
+- **Multi-Instance-Sicherheit**: `FOR UPDATE SKIP LOCKED` für skalierbare Projektionen (v1.1)
 - Umfassende Test-Suite (60+ Tests für Edge-Cases, Handler & Replay) + k6-Loadtests
 - Devbox-Komplettumgebung
 
