@@ -9,7 +9,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.time.OffsetDateTime;
 
 @ApplicationScoped
-public class VertreterCreatedOrUpdatedHandler implements VertreterEventHandler {
+@HandlesEvents(value = "space.maatini.vertreter.", aggregate = VertreterAggregate.class)
+public class VertreterCreatedOrUpdatedHandler implements AggregateEventHandler<VertreterAggregate> {
 
     private static final String PREFIX = "space.maatini.vertreter.";
     private static final String CREATED = PREFIX + "created";

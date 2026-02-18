@@ -18,17 +18,16 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Async Projector that reads unprocessed events and updates the
- * VertreterAggregate via a Handler-Registry pattern.
+ * aggregate state via a Handler-Registry pattern.
  * Listens for PostgreSQL LISTEN/NOTIFY for near-realtime processing.
  */
 @ApplicationScoped
-public class VertreterProjectorService {
+public class ProjectionService {
 
     private static final int BATCH_SIZE = 50;
     private static final long STARTUP_DELAY_MS = 2000;
@@ -37,21 +36,29 @@ public class VertreterProjectorService {
 
     private final PgPool pgPool;
     private final Vertx vertx;
-    private final List<VertreterEventHandler> handlers;
+    private final java.util.Map<String, java.util.List<EventHandler>> handlerRegistry = new java.util.HashMap<>();
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
     private volatile SqlConnection listeningConnection;
 
     @Inject
-    public VertreterProjectorService(PgPool pgPool, Vertx vertx, Instance<VertreterEventHandler> handlerInstances) {
+    public ProjectionService(PgPool pgPool, Vertx vertx, Instance<AggregateEventHandler<?>> handlerInstances) {
         this.pgPool = pgPool;
         this.vertx = vertx;
-        this.handlers = handlerInstances.stream().toList();
+        handlerInstances.handles().forEach(handle -> {
+            AggregateEventHandler<?> handler = handle.get();
+            Class<?> beanClass = handle.getBean().getBeanClass();
+            HandlesEvents annotation = beanClass.getAnnotation(HandlesEvents.class);
+            if (annotation != null) {
+                String prefix = annotation.value();
+                handlerRegistry.computeIfAbsent(prefix, k -> new java.util.ArrayList<>()).add(handler);
+            }
+        });
     }
 
     public void onStart(@Observes StartupEvent ev) {
-        Log.infof("VertreterProjectorService started with %d handler(s)", handlers.size());
+        Log.infof("ProjectionService started with %d aggregate domain(s)", handlerRegistry.size());
         vertx.setTimer(STARTUP_DELAY_MS, id -> listenForNotifications());
     }
 
@@ -164,8 +171,11 @@ public class VertreterProjectorService {
     }
 
     private Uni<Void> processEvent(CloudEvent event) {
-        return handlers.stream()
-                .filter(h -> h.canHandle(event.getType()))
+        String eventType = event.getType();
+        return handlerRegistry.entrySet().stream()
+                .filter(entry -> eventType.startsWith(entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
+                .filter(h -> h.canHandle(eventType))
                 .findFirst()
                 .map(handler -> handler.handle(event)
                         .chain(() -> markAsProcessed(event)))
@@ -183,6 +193,8 @@ public class VertreterProjectorService {
      */
     @WithTransaction
     public Uni<Integer> replayAll(UUID fromEventId) {
+        // In a fully generic version, we'd iterate over all managed aggregates.
+        // For now, we still target the template's primary aggregate.
         return VertreterAggregate.deleteAll()
                 .chain(() -> {
                     if (fromEventId != null) {

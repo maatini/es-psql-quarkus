@@ -1,7 +1,7 @@
 package space.maatini.eventsourcing.resource;
 
 import space.maatini.eventsourcing.dto.ErrorResponse;
-import space.maatini.eventsourcing.service.VertreterProjectorService;
+import space.maatini.eventsourcing.service.ProjectionService;
 import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -22,9 +22,9 @@ import java.util.UUID;
 @Tag(name = "Admin", description = "Administration and maintenance endpoints")
 public class AdminResource {
 
-    private final VertreterProjectorService projectorService;
+    private final ProjectionService projectorService;
 
-    public AdminResource(VertreterProjectorService projectorService) {
+    public AdminResource(ProjectionService projectorService) {
         this.projectorService = projectorService;
     }
 

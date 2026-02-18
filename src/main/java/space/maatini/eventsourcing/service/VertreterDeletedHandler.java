@@ -9,7 +9,8 @@ import jakarta.enterprise.context.ApplicationScoped;
  * Handler für das Löschen eines Vertreters.
  */
 @ApplicationScoped
-public class VertreterDeletedHandler implements VertreterEventHandler {
+@HandlesEvents(value = "space.maatini.vertreter.", aggregate = VertreterAggregate.class)
+public class VertreterDeletedHandler implements AggregateEventHandler<VertreterAggregate> {
 
     private static final String DELETED = "space.maatini.vertreter.deleted";
 

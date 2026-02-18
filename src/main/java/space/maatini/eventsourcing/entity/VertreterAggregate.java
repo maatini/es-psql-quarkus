@@ -13,12 +13,12 @@ import jakarta.persistence.Table;
 
 /**
  * Read-only aggregate entity for Vertreter.
- * The state is computed by the Java application (VertreterProjectorService),
+ * The state is computed by the Java application (ProjectionService),
  * not by DB triggers.
  */
 @Entity
 @Table(name = "vertreter_aggregate")
-public class VertreterAggregate extends PanacheEntityBase {
+public class VertreterAggregate extends PanacheEntityBase implements AggregateRoot {
 
     @Id
     private String id;

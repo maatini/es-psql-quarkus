@@ -14,7 +14,7 @@ import org.jboss.logging.Logger;
 
 /**
  * Service for storing and retrieving CloudEvents.
- * The aggregation is handled by the VertreterProjectorService, not this
+ * The aggregation is handled by the ProjectionService, not this
  * service.
  */
 @ApplicationScoped
