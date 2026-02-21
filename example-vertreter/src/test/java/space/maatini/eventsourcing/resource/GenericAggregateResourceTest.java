@@ -12,7 +12,7 @@ import static org.hamcrest.Matchers.hasItem;
 
 @QuarkusTest
 @io.quarkus.test.junit.TestProfile(space.maatini.eventsourcing.TestProfile.class)
-@io.quarkus.test.security.TestSecurity(user = "test", roles = {"user", "admin"})
+
 public class GenericAggregateResourceTest {
 
     @org.junit.jupiter.api.BeforeEach

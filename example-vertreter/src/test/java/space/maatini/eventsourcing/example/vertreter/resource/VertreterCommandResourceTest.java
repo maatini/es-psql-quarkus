@@ -13,7 +13,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 
 @QuarkusTest
 @io.quarkus.test.junit.TestProfile(space.maatini.eventsourcing.TestProfile.class)
-@io.quarkus.test.security.TestSecurity(user = "test", roles = {"user", "admin"})
+
 class VertreterCommandResourceTest {
 
     private static final String CMD_PATH = "/commands/vertreter";

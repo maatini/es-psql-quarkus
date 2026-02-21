@@ -11,13 +11,11 @@ import space.maatini.eventsourcing.example.vertreter.dto.command.UpdateVertreter
 import space.maatini.eventsourcing.command.CommandBus;
 import space.maatini.eventsourcing.example.vertreter.domain.Vertreter;
 import space.maatini.eventsourcing.example.vertreter.dto.command.DeleteVertreterCommand;
-import jakarta.annotation.security.RolesAllowed;
 
 @Path("/commands/vertreter")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Command Resource", description = "Endpoints for executing business commands on Vertreter aggregates")
-@RolesAllowed("user")
 public class VertreterCommandResource {
 
     private final CommandBus commandBus;

@@ -3,7 +3,6 @@ package space.maatini.eventsourcing.resource;
 import space.maatini.eventsourcing.dto.ErrorResponse;
 import space.maatini.eventsourcing.service.ProjectionService;
 import io.smallrye.mutiny.Uni;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -21,7 +20,6 @@ import java.util.UUID;
 @Path("/admin")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Admin", description = "Administration and maintenance endpoints")
-@RolesAllowed("admin")
 public class AdminResource {
 
     private final ProjectionService projectorService;

@@ -8,7 +8,7 @@
     </parent>
     <artifactId>eventsourcing-core</artifactId>
     <name>Event Sourcing Core</name>
-    <description>Reusable event sourcing framework: CommandBus, Snapshotting, Outbox, OIDC</description>
+    <description>Reusable event sourcing framework: CommandBus, Snapshotting, Outbox</description>
 
     <dependencies>
         <!-- Quarkus Core -->
@@ -65,11 +65,7 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
-        <!-- OIDC -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-oidc</artifactId>
-        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>io.quarkus</groupId>

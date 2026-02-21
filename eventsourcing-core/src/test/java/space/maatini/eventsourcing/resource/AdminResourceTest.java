@@ -15,7 +15,7 @@ import static org.hamcrest.CoreMatchers.*;
  */
 @QuarkusTest
 @io.quarkus.test.junit.TestProfile(space.maatini.eventsourcing.TestProfile.class)
-@io.quarkus.test.security.TestSecurity(user = "test", roles = {"admin", "user"})
+
 class AdminResourceTest {
 
     @org.junit.jupiter.api.BeforeEach

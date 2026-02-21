@@ -16,7 +16,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  */
 @QuarkusTest
 @io.quarkus.test.junit.TestProfile(space.maatini.eventsourcing.TestProfile.class)
-@io.quarkus.test.security.TestSecurity(user = "test", roles = {"admin", "user"})
+
 class AdminReplayTest {
 
     @org.junit.jupiter.api.BeforeEach

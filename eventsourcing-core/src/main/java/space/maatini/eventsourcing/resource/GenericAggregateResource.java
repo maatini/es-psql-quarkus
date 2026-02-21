@@ -10,13 +10,11 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import jakarta.annotation.security.RolesAllowed;
 import space.maatini.eventsourcing.service.GenericAggregateService;
 
 @Path("/aggregates")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Generic Aggregates")
-@RolesAllowed("user")
 public class GenericAggregateResource {
 
     @Inject

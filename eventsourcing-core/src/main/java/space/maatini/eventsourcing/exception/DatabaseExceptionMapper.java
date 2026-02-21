@@ -23,7 +23,8 @@ public class DatabaseExceptionMapper implements ExceptionMapper<ConstraintViolat
 
         String message = "Database constraint violation";
         if (exception.getConstraintName() != null) {
-            if ("unique_subject_version".equals(exception.getConstraintName())) {
+            String constraintName = exception.getConstraintName().toLowerCase();
+            if (constraintName.contains("subject_version") || constraintName.contains("subject_aggregate_version") || constraintName.contains("concurrency")) {
                 message = "Concurrency conflict: Another version of this aggregate was already stored. Please reload and try again.";
             } else {
                 message = "Constraint violation: " + exception.getConstraintName();
