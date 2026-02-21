@@ -21,9 +21,11 @@ import org.jboss.logging.Logger;
 public class EventService {
 
     private final Logger log;
+    private final EventValidationService validationService;
 
-    public EventService(Logger log) {
+    public EventService(Logger log, EventValidationService validationService) {
         this.log = log;
+        this.validationService = validationService;
     }
 
     /**
@@ -38,6 +40,17 @@ public class EventService {
         CloudEventDTO event = dto.withDefaults();
 
         log.debugf("Storing event: id=%s, type=%s, subject=%s", event.id(), event.type(), event.subject());
+
+        if (event.dataschema() != null && !event.dataschema().isBlank()) {
+            try {
+                java.util.Set<com.networknt.schema.ValidationMessage> errors = validationService.validate(event.dataschema(), event.data());
+                if (errors != null && !errors.isEmpty()) {
+                    throw new space.maatini.eventsourcing.exception.JsonSchemaValidationException("Event payload does not match schema " + event.dataschema(), errors);
+                }
+            } catch (IllegalArgumentException e) {
+                throw new space.maatini.eventsourcing.exception.JsonSchemaValidationException(e.getMessage(), java.util.Set.of());
+            }
+        }
 
         // Check for idempotency - if event already exists, return it
         return CloudEvent.<CloudEvent>findById(event.id())

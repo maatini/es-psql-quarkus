@@ -228,6 +228,30 @@ class EventResourceTest {
         }
 
         @Test
+        @DisplayName("POST /events - Invalid payload against dataschema returns 400")
+        void invalidPayloadAgainstSchema_returns400() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .body("""
+                            {
+                                "id": "%s",
+                                "source": "/test-service",
+                                "type": "space.maatini.vertreter.created",
+                                "dataschema": "space.maatini.vertreter.created.json",
+                                "data": {
+                                    "vertreterNr": "V",
+                                    "status": "UNGÜLTIG"
+                                }
+                            }
+                            """.formatted(UUID.randomUUID()))
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(400)
+                    .body("error", equalTo("JSON Schema Validation failed"));
+        }
+
+        @Test
         @DisplayName("POST /events - Missing type returns 400")
         void missingType_returns400() {
             given()
@@ -478,17 +502,21 @@ class EventResourceTest {
                             {
                                 "id": "%s",
                                 "source": "/test-service",
-                                "type": "de.test.event",
-                                "dataschema": "https://schema.example.com/v1/vertreter",
+                                "type": "space.maatini.vertreter.created",
+                                "dataschema": "space.maatini.vertreter.created.json",
                                 "aggregateVersion": 1,
-                                "data": {"id": "v1"}
+                                "data": {
+                                    "vertreterNr": "V123",
+                                    "name": "Max Mustermann",
+                                    "status": "AKTIV"
+                                }
                             }
                             """.formatted(UUID.randomUUID()))
                     .when()
                     .post(EVENTS_PATH)
                     .then()
                     .statusCode(201)
-                    .body("dataschema", equalTo("https://schema.example.com/v1/vertreter"));
+                    .body("dataschema", equalTo("space.maatini.vertreter.created.json"));
         }
 
         @Test

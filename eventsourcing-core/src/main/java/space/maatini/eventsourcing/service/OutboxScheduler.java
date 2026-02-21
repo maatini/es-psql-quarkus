@@ -4,6 +4,7 @@ import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 import space.maatini.eventsourcing.entity.OutboxEvent;
@@ -27,8 +28,15 @@ public class OutboxScheduler {
     // Lock to prevent concurrent execution if schedule overlaps
     private boolean isRunning = false;
 
+    @ConfigProperty(name = "eventsourcing.outbox.polling.enabled", defaultValue = "true")
+    boolean pollingEnabled;
+
     @Scheduled(every = "5s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void processOutboxEvents() {
+        if (!pollingEnabled) {
+            return;
+        }
+        
         if (isRunning) return;
         isRunning = true;
         

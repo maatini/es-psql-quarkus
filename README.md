@@ -131,6 +131,7 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 - Replay-Fähigkeit (kompletter Neuaufbau beider Read-Models)
 - **Optimistic Concurrency Control** – Hardware-Level Schutz vor Race-Conditions (HTTP 409 Conflict)
 - **Functional Outbox Pattern** – erweiterbares Dispatching via `OutboxPublisher`
+- **Optionales Debezium-Modul** – Kafka Connect Integration für Change Data Capture (CDC) der Outbox-Tabelle
 - **Docker Compose** + **Kubernetes-Manifeste** für Production-Deployments
 - Umfassende Test-Suite (46 Tests) mit `@TestProfile` und `@TestSecurity`
 - Devbox-Komplettumgebung
@@ -325,11 +326,23 @@ devbox run k6 run benchmarks/load-test.js
 
 ## Deployment
 
-### Docker Compose
+### Docker Compose (Standard)
 ```bash
-# Build + Start (PostgreSQL + Keycloak + App)
+# Build + Start (PostgreSQL + App)
 ./mvnw package -DskipTests
 docker compose up --build
+```
+
+### Docker Compose (Debezium Change Data Capture)
+```bash
+# Build + Start (PostgreSQL, Zookeeper, Kafka, Kafka Connect & App)
+./mvnw package -DskipTests
+docker compose -f docker-compose.debezium.yml up --build
+
+# In diesem Setup ist das interne Outbox-Polling der App deaktiviert 
+# (EVENTSOURCING_OUTBOX_POLLING_ENABLED=false).
+# An seiner Stelle kann Kafka Connect konfiguriert werden, 
+# um die Tabelle outbox_events auszulesen.
 ```
 
 ### Kubernetes
