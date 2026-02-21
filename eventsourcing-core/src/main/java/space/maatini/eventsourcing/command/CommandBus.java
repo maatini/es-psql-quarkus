@@ -76,10 +76,9 @@ public class CommandBus {
     private <A extends DomainAggregateRoot> Uni<A> loadAggregate(String aggregateId, Class<A> aggregateClass) {
         return snapshotService.getLatestSnapshot(aggregateId, aggregateClass.getSimpleName())
             .chain(snapshot -> {
-                int startOffset = snapshot != null ? snapshot.aggregateVersion : 0;
+                int startVersion = snapshot != null ? snapshot.aggregateVersion : 0;
                 
-                return CloudEvent.<CloudEvent>find("subject = ?1 ORDER BY createdAt ASC", aggregateId)
-                        .range(startOffset, Integer.MAX_VALUE - 1)
+                return CloudEvent.<CloudEvent>find("subject = ?1 AND aggregateVersion > ?2 ORDER BY aggregateVersion ASC", aggregateId, startVersion)
                         .list()
                         .map(events -> {
                             try {

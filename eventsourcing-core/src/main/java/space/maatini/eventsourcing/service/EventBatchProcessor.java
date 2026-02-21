@@ -114,7 +114,7 @@ public class EventBatchProcessor {
                 .setParameter("err", t.getMessage())
                 .setParameter("retries", event.getRetryCount())
                 .executeUpdate()
-            ).chain(() -> event.delete().replaceWithVoid());
+            ).chain(() -> event.persist().replaceWithVoid());
         }
         return event.persist().replaceWithVoid();
     }
