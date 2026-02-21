@@ -4,7 +4,7 @@
 ![Build Status](https://github.com/maatini/es-psql-quarkus/actions/workflows/ci.yml/badge.svg)
 
 
-**High-Performance Event Sourcing Framework v2.0** mit Quarkus 3.31, CloudEvents und vollständigem **CQRS-Muster** via PostgreSQL LISTEN/NOTIFY.
+**High-Performance Event Sourcing Framework v2.1** mit Quarkus 3.x, CloudEvents und vollständigem **CQRS-Muster** via PostgreSQL LISTEN/NOTIFY.
 
 ![Banner](doc/banner_placeholder.png)
 
@@ -27,8 +27,9 @@ graph TD
     end
 
     subgraph "Outbox (Garantierte Zustellung)"
-        SCHED["OutboxScheduler<br/>(5s Polling)"] --> |"PENDING → SENT"| DB_Outbox
-        SCHED -.-> |"Kafka / RabbitMQ"| EXT["Externe Systeme"]
+        SCHED["OutboxScheduler<br/>(5s Polling)"] --> PUB["OutboxPublisher<br/>(Interface)"]
+        PUB --> |"Log / Kafka / Rabbit"| EXT["Externe Systeme"]
+        PUB -.-> |"status = SENT"| DB_Outbox
     end
 
     subgraph "Async Projection"
@@ -59,9 +60,8 @@ graph TD
 **Kernprinzipien:**
 - **Generic CommandBus** routet Commands an registrierte `CommandHandler` via `@HandlesCommand`
 - **Aggregate Snapshots** reduzieren Replay-Overhead (automatisch alle 100 Versionen)
-- **Transactional Outbox Pattern** garantiert zuverlässige Event-Zustellung
-- **OIDC/JWT Security** via Keycloak mit `@RolesAllowed`-Absicherung
-- **Dual-Mode Read-Model**: klassische Tabellen (Stufe 1) und generisches JSONB (Stufe 2)
+- **Optimistic Concurrency Control** via `aggregate_version` und DB-Unique-Constraint
+- **Functional Outbox** mit erweiterbarem `OutboxPublisher`-Interface
 - **Event Versioning** über `dataVersion` für sichere Schema-Evolution
 
 ## Voraussetzungen
@@ -136,10 +136,10 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 - **Vollständig generisches JSON-basiertes Read-Model (Stufe 2)**
 - Vollständige Revisionssicherheit (unveränderlicher Event-Log)
 - Replay-Fähigkeit (kompletter Neuaufbau beider Read-Models)
-- **Robustes Error Handling**: Automatischer Retry & Dead-Letter-Logik
-- **Monitoring**: Micrometer/Prometheus + Custom HealthChecks
+- **Optimistic Concurrency Control** – Hardware-Level Schutz vor Race-Conditions (HTTP 409 Conflict)
+- **Functional Outbox Pattern** – erweiterbares Dispatching via `OutboxPublisher`
 - **Docker Compose** + **Kubernetes-Manifeste** für Production-Deployments
-- Umfassende Test-Suite (45 Tests) mit `@TestProfile` und `@TestSecurity`
+- Umfassende Test-Suite (46 Tests) mit `@TestProfile` und `@TestSecurity`
 - Devbox-Komplettumgebung
 
 ## Paketstruktur
@@ -302,12 +302,12 @@ devbox run k6 run benchmarks/load-test.js
 
 | Metrik | Ergebnis |
 |--------|----------|
+| **Tests Gesamt** | 46 ✅ |
 | **Iterationen** | 14.687 (in 100 s) |
 | **Throughput** | ~146 Iterationen/s |
 | **HTTP-Requests gesamt** | 44.054 (∼440 req/s) |
 | **P90 Latency** | 6.47 ms |
-| **P95 Latency** | 7.7 ms ✅ (Threshold: < 100 ms) |
-| **P95 Latency (nur 2xx)** | 5.8 ms |
+| **P95 Latency** | 7.7 ms ✅ |
 | **Business Error Rate** | 0% |
 | **VUs** | 20 |
 

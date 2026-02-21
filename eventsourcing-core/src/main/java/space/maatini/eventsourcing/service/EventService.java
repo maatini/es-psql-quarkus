@@ -61,6 +61,7 @@ public class EventService {
                     entity.setDatacontenttype(event.datacontenttype());
                     entity.setDataschema(event.dataschema());
                     entity.setDataVersion(event.dataVersion());
+                    entity.setAggregateVersion(event.aggregateVersion());
                     entity.setData(dataJson);
 
                     // Persist - the projector service will handle aggregation

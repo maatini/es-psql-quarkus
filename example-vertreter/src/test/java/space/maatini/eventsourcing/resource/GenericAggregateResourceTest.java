@@ -39,6 +39,7 @@ public class GenericAggregateResourceTest {
                 .put("id", UUID.randomUUID().toString())
                 .put("type", "space.maatini.vertreter.created")
                 .put("subject", id)
+                .put("aggregateVersion", 1)
                 .put("data", eventData)
                 .put("source", "/tests");
 

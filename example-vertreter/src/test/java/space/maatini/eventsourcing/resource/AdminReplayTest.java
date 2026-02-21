@@ -50,6 +50,7 @@ class AdminReplayTest {
                             "id": "%s",
                             "source": "/test-service",
                             "type": "space.maatini.vertreter.created",
+                            "aggregateVersion": 1,
                             "data": {"id": "%s", "name": "Admin Trigger Test", "email": "admin-trigger@test.com"}
                         }
                         """.formatted(UUID.randomUUID(), vertreterId))
@@ -79,6 +80,7 @@ class AdminReplayTest {
                             "id": "%s",
                             "source": "/test-service",
                             "type": "space.maatini.vertreter.created",
+                            "aggregateVersion": 1,
                             "data": {"id": "%s", "name": "Replay Test", "email": "replay@test.com"}
                         }
                         """.formatted(UUID.randomUUID(), vertreterId))
@@ -111,6 +113,7 @@ class AdminReplayTest {
                             "id": "%s",
                             "source": "/test-service",
                             "type": "space.maatini.vertreter.created",
+                            "aggregateVersion": 1,
                             "data": {"id": "%s", "name": "Side Effect Test", "email": "side@test.com"}
                         }
                         """.formatted(UUID.randomUUID(), vertreterId))

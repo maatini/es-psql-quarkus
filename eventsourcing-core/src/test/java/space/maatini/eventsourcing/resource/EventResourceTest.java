@@ -152,6 +152,34 @@ class EventResourceTest {
                     .statusCode(200)
                     .body("size()", greaterThanOrEqualTo(0));
         }
+
+        @Test
+        @DisplayName("POST /events - Concurrency conflict returns 409")
+        void concurrencyConflict_returns409() {
+            String subject = "conflict-" + UUID.randomUUID();
+            String event1Id = UUID.randomUUID().toString();
+            String event2Id = UUID.randomUUID().toString();
+
+            // First event for version 1 - SUCCESS
+            given()
+                    .contentType(ContentType.JSON)
+                    .body(createValidEventWithSubject(event1Id, "data-1", subject))
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(201);
+
+            // Second event for SAME subject AND SAME version (1) - CONFLICT
+            given()
+                    .contentType(ContentType.JSON)
+                    .body(createValidEventWithSubject(event2Id, "data-2", subject))
+                    .when()
+                    .post(EVENTS_PATH)
+                    .then()
+                    .statusCode(409)
+                    .body("error", equalTo("Concurrency Conflict"))
+                    .body("message", containsString("Concurrency conflict"));
+        }
     }
 
     // ==================== VALIDATION TESTS ====================
@@ -246,6 +274,7 @@ class EventResourceTest {
                                 "id": "%s",
                                 "source": "/test-service",
                                 "type": "de.other.event",
+                                "aggregateVersion": 1,
                                 "data": {}
                             }
                             """.formatted(UUID.randomUUID()))
@@ -355,6 +384,7 @@ class EventResourceTest {
                                 "source": "/test-service",
                                 "type": "de.test.event",
                                 "subject": null,
+                                "aggregateVersion": 1,
                                 "data": {"test": "value"}
                             }
                             """.formatted(UUID.randomUUID()))
@@ -376,6 +406,7 @@ class EventResourceTest {
                                 "source": "/test-service",
                                 "type": "de.test.event",
                                 "subject": "v/001-test_🚀",
+                                "aggregateVersion": 1,
                                 "data": {"test": "value"}
                             }
                             """.formatted(UUID.randomUUID()))
@@ -396,6 +427,7 @@ class EventResourceTest {
                                 "id": "%s",
                                 "source": "/test-service",
                                 "type": "de.test.event",
+                                "aggregateVersion": 1,
                                 "data": {
                                     "id": "v1",
                                     "nested": {
@@ -426,6 +458,7 @@ class EventResourceTest {
                                 "source": "/test-service",
                                 "type": "de.test.event",
                                 "datacontenttype": "application/xml",
+                                "aggregateVersion": 1,
                                 "data": {"xml": "<test>value</test>"}
                             }
                             """.formatted(UUID.randomUUID()))
@@ -447,6 +480,7 @@ class EventResourceTest {
                                 "source": "/test-service",
                                 "type": "de.test.event",
                                 "dataschema": "https://schema.example.com/v1/vertreter",
+                                "aggregateVersion": 1,
                                 "data": {"id": "v1"}
                             }
                             """.formatted(UUID.randomUUID()))
@@ -468,6 +502,7 @@ class EventResourceTest {
                                 "source": "/test-service",
                                 "type": "de.test.event",
                                 "time": "2025-01-01T12:00:00Z",
+                                "aggregateVersion": 1,
                                 "data": {"id": "v1"}
                             }
                             """.formatted(UUID.randomUUID()))
@@ -512,6 +547,7 @@ class EventResourceTest {
                                 "id": "%s",
                                 "source": "/test-service",
                                 "type": "de.test.large",
+                                "aggregateVersion": 1,
                                 "data": {"bigField": "%s"}
                             }
                             """.formatted(UUID.randomUUID(), largeValue))
@@ -531,6 +567,7 @@ class EventResourceTest {
                     "source": "/test-service",
                     "type": "space.maatini.vertreter.updated",
                     "subject": "%s",
+                    "aggregateVersion": 1,
                     "data": {
                         "id": "%s",
                         "name": "Test Vertreter",
@@ -547,6 +584,7 @@ class EventResourceTest {
                     "source": "/test-service",
                     "type": "space.maatini.vertreter.updated",
                     "subject": "%s",
+                    "aggregateVersion": 1,
                     "data": {
                         "id": "%s",
                         "name": "Test Vertreter",

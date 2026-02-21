@@ -18,6 +18,11 @@ import java.time.OffsetDateTime;
 public class OutboxScheduler {
 
     private final Logger log = Logger.getLogger(OutboxScheduler.class);
+    private final OutboxPublisher publisher;
+
+    public OutboxScheduler(OutboxPublisher publisher) {
+        this.publisher = publisher;
+    }
 
     // Lock to prevent concurrent execution if schedule overlaps
     private boolean isRunning = false;
@@ -52,13 +57,15 @@ public class OutboxScheduler {
 
                 return Multi.createFrom().iterable(events)
                     .onItem().transformToUniAndConcatenate(event -> {
-                        // TODO: Actually send the event to Kafka, RabbitMQ, SNS etc.
                         log.debugf("Dispatching outbound event %s / topic: %s", event.id, event.topic);
                         
-                        // Mark as SENT
-                        event.status = "SENT";
-                        event.processedAt = OffsetDateTime.now();
-                        return event.persist();
+                        return publisher.publish(event)
+                            .chain(() -> {
+                                // Mark as SENT
+                                event.status = "SENT";
+                                event.processedAt = OffsetDateTime.now();
+                                return event.persist();
+                            });
                     })
                     .collect().last().replaceWithVoid();
             });

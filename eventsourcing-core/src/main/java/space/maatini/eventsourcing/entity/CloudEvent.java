@@ -68,7 +68,18 @@ public class CloudEvent extends PanacheEntityBase {
     @Column(name = "data_version", nullable = false)
     private Integer dataVersion = 1;
 
+    @Column(name = "aggregate_version", nullable = false)
+    private Integer aggregateVersion;
+
     // --- Getters & Setters ---
+
+    public Integer getAggregateVersion() {
+        return aggregateVersion;
+    }
+
+    public void setAggregateVersion(Integer aggregateVersion) {
+        this.aggregateVersion = aggregateVersion;
+    }
 
     public UUID getId() {
         return id;

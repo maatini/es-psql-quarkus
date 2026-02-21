@@ -23,7 +23,11 @@ public abstract class DomainAggregateRoot {
 
     public void apply(CloudEvent event) {
         mutate(event);
-        version++;
+        if (event.getAggregateVersion() != null) {
+            this.version = event.getAggregateVersion();
+        } else {
+            this.version++;
+        }
     }
 
     protected void applyNewEvent(CloudEvent event) {
@@ -52,6 +56,7 @@ public abstract class DomainAggregateRoot {
         event.setSubject(subject);
         event.setTime(OffsetDateTime.now());
         event.setData(data);
+        event.setAggregateVersion(this.version + 1);
         
         applyNewEvent(event);
     }
