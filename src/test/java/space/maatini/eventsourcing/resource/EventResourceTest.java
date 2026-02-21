@@ -5,6 +5,7 @@ import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import io.quarkus.test.security.TestSecurity;
 
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  * Tests cover happy path, validation edge cases, and boundary conditions.
  */
 @QuarkusTest
+@io.quarkus.test.security.TestSecurity(user = "test", roles = {"user", "admin"})
 class EventResourceTest {
 
     @org.junit.jupiter.api.BeforeEach
@@ -34,6 +36,7 @@ class EventResourceTest {
 
     @Nested
     @DisplayName("Happy Path")
+    @io.quarkus.test.security.TestSecurity(user = "test", roles = {"admin"})
     class HappyPath {
 
         @Test
@@ -154,6 +157,7 @@ class EventResourceTest {
 
     @Nested
     @DisplayName("Validation Edge Cases")
+    @io.quarkus.test.security.TestSecurity(user = "test", roles = {"admin"})
     class ValidationEdgeCases {
 
         @Test
@@ -336,6 +340,7 @@ class EventResourceTest {
 
     @Nested
     @DisplayName("Boundary Cases")
+    @io.quarkus.test.security.TestSecurity(user = "test", roles = {"admin"})
     class BoundaryCases {
 
         @Test

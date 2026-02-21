@@ -9,6 +9,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import space.maatini.eventsourcing.domain.DomainAggregateRoot;
 import space.maatini.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.entity.OutboxEvent;
 import space.maatini.eventsourcing.service.AggregateSnapshotService;
 import io.vertx.core.json.JsonObject;
 
@@ -113,7 +114,16 @@ public class CommandBus {
             return Uni.createFrom().voidItem();
         }
         return Multi.createFrom().iterable(aggregate.getUncommittedEvents())
-                .onItem().transformToUniAndConcatenate(event -> event.persist())
+                .onItem().transformToUniAndConcatenate(event -> {
+                    OutboxEvent outbox = new OutboxEvent();
+                    outbox.topic = event.getType();
+                    if (event.getData() != null) {
+                        outbox.payload = event.getData().getMap();
+                    }
+                    
+                    return event.<CloudEvent>persist()
+                            .chain(() -> outbox.persist());
+                })
                 .collect().last().replaceWithVoid();
     }
 }

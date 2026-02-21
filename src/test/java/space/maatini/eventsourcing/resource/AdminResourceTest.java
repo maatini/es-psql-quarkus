@@ -21,6 +21,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  * other tests.
  */
 @QuarkusTest
+@io.quarkus.test.security.TestSecurity(user = "test", roles = {"admin", "user"})
 class AdminResourceTest {
 
     @org.junit.jupiter.api.BeforeEach
