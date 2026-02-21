@@ -11,10 +11,10 @@ import space.maatini.eventsourcing.entity.AggregateSnapshot;
 
 /**
  * Test-only REST resource for database cleanup between tests.
- * This is registered automatically during @QuarkusTest runs.
+ * This is registered automatically during @QuarkusTest runs since
+ * it lives in src/test/java.
  */
 @Path("/test-support")
-@io.quarkus.arc.profile.IfBuildProfile("test")
 public class TestSupportResource {
 
     @POST
