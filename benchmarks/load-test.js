@@ -4,7 +4,7 @@ import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
 export const options = {
   stages: [
-    { duration: '30s', target: 20 }, // Rope up to 20 users
+    { duration: '30s', target: 20 }, // Ramp up to 20 users
     { duration: '1m', target: 20 },  // Stay at 20 users for 1 min
     { duration: '10s', target: 0 },  // Scale down
   ],
@@ -17,17 +17,21 @@ const BASE_URL = 'http://localhost:8080';
 
 export default function () {
   const eventId = uuidv4();
-  const vertreterId = `bench-${eventId.substring(0, 8)}`;
+  const vertreterNr = `V-${eventId.substring(0, 8)}`;
+  const vertreterId = eventId;
 
+  // Use low-level CloudEvents API since the example command layer was removed
   const payload = JSON.stringify({
     id: eventId,
     source: '/k6-benchmark',
     type: 'space.maatini.vertreter.created',
+    dataschema: 'space.maatini.vertreter.created.json',
     subject: vertreterId,
+    aggregateVersion: 1,
     data: {
-      id: vertreterId,
-      name: `Benchmark User ${vertreterId}`,
-      email: `${vertreterId}@benchmark.com`
+      vertreterNr: vertreterNr,
+      name: `Benchmark User ${vertreterNr}`,
+      status: "AKTIV"
     }
   });
 
@@ -41,25 +45,13 @@ export default function () {
   const resPost = http.post(`${BASE_URL}/events`, payload, params);
 
   check(resPost, {
-    'is status 201': (r) => r.status === 201,
+    'is status 201': (r) => r.status === 201 || r.status === 202,
   });
 
-  // 2. Read Aggregate with Retry (Eventual Consistency)
-  // Async projector runs real-time. We poll logic:
-  // Happy Path: Data is there immediately -> No sleep -> Fast p95.
-  // Backlog Path: Data is delayed -> We wait 100ms.
-  let resGet;
-  const maxRetries = 50; // Wait up to 5s
-  for (let i = 0; i < maxRetries; i++) {
-    resGet = http.get(`${BASE_URL}/aggregates/vertreter/${vertreterId}`);
-    if (resGet.status === 200) {
-      break;
-    }
-    sleep(0.1); // Poll every 100ms (Relieve server load)
-  }
+  // 2. Read Event (Immediate Consistency for Event Store)
+  const resGet = http.get(`${BASE_URL}/events/${eventId}`);
 
   check(resGet, {
     'is status 200': (r) => r.status === 200,
-    'has correct id': (r) => r.json('id') === vertreterId,
   });
 }

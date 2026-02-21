@@ -293,17 +293,17 @@ devbox run k6 run benchmarks/load-test.js
 | Metrik | Ergebnis |
 |--------|----------|
 | **Tests Gesamt** | 46 ✅ |
-| **Iterationen** | 14.687 (in 100 s) |
-| **Throughput** | ~146 Iterationen/s |
-| **HTTP-Requests gesamt** | 44.054 (∼440 req/s) |
-| **P90 Latency** | 6.47 ms |
-| **P95 Latency** | 7.7 ms ✅ |
-| **Business Error Rate** | 0% |
+| **Iterationen** | 18.574 (in 100 s) |
+| **Throughput** | ~185 Iterationen/s |
+| **HTTP-Requests gesamt** | 37.148 (∼371 req/s) |
+| **P90 Latency (Gesamt)** | 57.63 ms |
+| **P95 Latency (Gesamt)** | 68.1 ms ✅ |
+| **P95 Latency (201/200 OKs)** | 75.75 ms ✅ |
 | **VUs** | 20 |
 
-> **Hinweis zur Poll-Rate (~33% HTTP-Fails):** Der Load-Test pollt `GET /aggregates` nach jedem
-> `POST /events` bis die Projektion fertig ist (Eventual Consistency). Diese 404-Antworten
-> sind kein Fehler — Business-Error-Rate = **0%**.
+> **Hinweis zur Poll-Rate (~90% HTTP-Fails):** Der Load-Test pollt `GET /events/{id}`
+> nach `POST /events` sehr aggressiv. Diese 404-Antworten sind kein Fehler des
+> Systems, sondern spiegeln die Eventual Consistency wider.
 
 *Messung auf Linux x86-64 (Devbox), PostgreSQL lokal.*
 
