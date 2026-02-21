@@ -5,7 +5,8 @@
     "maven@latest",
     "quarkus@latest",
     "postgresql@17",
-    "k6@latest"
+    "k6@latest",
+    "github-cli@latest"
   ],
   "env": {
     "PGDATA":     "$PWD/.devbox/pgdata",
