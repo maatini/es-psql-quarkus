@@ -21,6 +21,13 @@ public @interface HandlesEvents {
 
     /**
      * The aggregate class this handler works on.
+     * Optional when using JsonAggregateHandler.
      */
-    Class<? extends AggregateRoot> aggregate();
+    Class<? extends AggregateRoot> aggregate() default AggregateRoot.class;
+
+    /**
+     * The generic aggregate type (e.g., "vertreter", "abwesenheit").
+     * Used for Stage 2 generic read-model.
+     */
+    String aggregateType() default "";
 }

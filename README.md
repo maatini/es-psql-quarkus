@@ -21,24 +21,28 @@ graph TD
 
     subgraph "Async Projection"
         DB_Notify --> |"LISTEN"| PROJ["ProjectionService<br/>+ Handler Registry"]
-        PROJ --> |"Handler Pattern"| DB_Agg[("PostgreSQL<br/>vertreter_aggregate")]
+        PROJ --> |"Handler Pattern (Stage 1)"| DB_Agg[("PostgreSQL<br/>vertreter_aggregate")]
+        PROJ --> |"JSON Handler (Stage 2)"| DB_Generic[("PostgreSQL<br/>aggregate_states")]
     end
 
     subgraph "Read Side (Query)"
         API_R["REST API<br/>(VertreterAggregateResource)<br/>GET /aggregates"] --> AS["VertreterAggregateService"]
         AS --> |"SELECT"| DB_Agg
+        API_G["Generic API<br/>(GenericAggregateResource)<br/>GET /aggregates/{type}"] --> GS["GenericAggregateService"]
+        GS --> |"JSON Query"| DB_Generic
     end
 
     classDef java fill:#2C3E50,stroke:#fff,stroke-width:2px,color:#fff;
     classDef db fill:#27AE60,stroke:#fff,stroke-width:2px,color:#fff;
 
-    class CMD,CS,VA,ES_RAW,API_R,AS,PROJ java;
-    class DB_Events,DB_Agg,DB_Notify db;
+    class CMD,CS,VA,ES_RAW,API_R,AS,PROJ,API_G,GS java;
+    class DB_Events,DB_Agg,DB_Notify,DB_Generic db;
 ```
 
 **Kernprinzipien:**
 - **Commands** prüfen Invarianten (Aggregate-Replay) bevor Events gespeichert werden
 - **SQL-Triggers** nur noch für NOTIFY – die gesamte Aggregationslogik liegt in Java
+- **Dual-Mode Read-Model**: Unterstützt sowohl klassische Tabellen (Stufe 1) als auch generisches JSONB (Stufe 2)
 - **Optimistic Locking** via JPA `@Version` – verhindert Race Conditions
 
 ## Voraussetzungen
@@ -78,7 +82,13 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 | `GET`  | `/events/subject/{subject}` | Events nach Subject                |
 | `GET`  | `/events/type/{type}`       | Events nach Typ                    |
 
-### Vertreter Aggregates (Read Side)
+### Generic Aggregates (Stage 2 – JSON-basiert)
+| Method | Path                         | Beschreibung                       |
+|--------|------------------------------|------------------------------------|
+| `GET`  | `/aggregates/{type}`         | Alle Aggregate eines Typs          |
+| `GET`  | `/aggregates/{type}/{id}`    | Aggregat nach ID                   |
+
+### Vertreter Aggregates (Stage 1 – Tabellen-basiert)
 | Method | Path                                           | Beschreibung                  |
 |--------|------------------------------------------------|-------------------------------|
 | `GET`  | `/aggregates/vertreter`                        | Alle Vertreter                |
@@ -99,14 +109,15 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 
 - **True CQRS** – Command-Side mit Domänen-Aggregaten und Invariant-Prüfung
 - Near-Realtime Updates durch PostgreSQL LISTEN/NOTIFY
+- **Vollständig generisches JSON-basiertes Read-Model (Stufe 2)**
 - Vollständige Revisionssicherheit (unveränderlicher Event-Log)
 - **Optimistic Locking** (JPA `@Version`) für Race Condition-Schutz
 - **DB Constraints**: `UNIQUE(email)`, `CHECK (version >= 0)`
 - Handler-Pattern für beliebig viele Aggregate
-- Replay-Fähigkeit (kompletter Neuaufbau des Read-Models)
+- Replay-Fähigkeit (kompletter Neuaufbau beider Read-Models)
 - **Robustes Error Handling**: Automatischer Retry & Dead-Letter-Logik
 - **Monitoring**: Micrometer/Prometheus + Custom HealthChecks
-- Umfassende Test-Suite (68 Tests) – voll isoliert via `@BeforeEach`-DB-Wipe
+- Umfassende Test-Suite (72 Tests) – voll isoliert via `@BeforeEach`-DB-Wipe
 - Devbox-Komplettumgebung
 
 ## Paketstruktur
@@ -123,16 +134,20 @@ src/main/java/space/maatini/eventsourcing/
 │       └── VertretenePersonCommandDTO.java
 ├── entity/                   # JPA Read-Models (Projektions-Tabellen)
 │   ├── AggregateRoot.java    # Marker-Interface für Entitäten
+│   ├── JsonAggregate.java    # Generisches JSON-Read-Model (Stufe 2)
 │   ├── CloudEvent.java
 │   └── VertreterAggregate.java
 ├── resource/                 # REST-Endpunkte
+│   ├── GenericAggregateResource.java # Generische API (Stufe 2)
 │   ├── VertreterCommandResource.java
 │   ├── VertreterAggregateResource.java
 │   ├── EventResource.java
 │   └── AdminResource.java
 └── service/                  # Applikationslogik & Handler
+    ├── JsonAggregateHandler.java # Basis für generische Handler (Stufe 2)
+    ├── VertreterJsonHandler.java # Beispiel generischer Handler
     ├── VertreterCommandService.java
-    ├── VertreterCreatedOrUpdatedHandler.java
+    ├── VertreterCreatedOrUpdatedHandler.java # Stufe 1 Handler
     ├── VertreterDeletedHandler.java
     ├── ProjectionService.java          # Facade
     ├── EventBatchProcessor.java
@@ -141,71 +156,41 @@ src/main/java/space/maatini/eventsourcing/
     └── EventNotificationListener.java  # PG LISTEN (deaktiviert im Test-Profil)
 ```
 
-## Neues Aggregat hinzufügen
+## Neues Aggregat hinzufügen (Stufe 2 - Generisch)
 
-### Schritt 1: Flyway-Migration & Read-Model (Entity Layer)
+Dies ist der empfohlene Weg, da er **keine Datenbank-Migrationen**, **keine JPA-Entitäten** und **keine neuen REST-Resourcen** erfordert.
 
-```sql
--- src/main/resources/db/migration/V11__abwesenheit.sql
-CREATE TABLE abwesenheit_aggregate (
-    id TEXT PRIMARY KEY,
-    grund TEXT,
-    event_id UUID,
-    version INTEGER,
-    updated_at TIMESTAMPTZ
-);
-```
-
-```java
-// Entität implementiert das Marker-Interface
-@Entity @Table(name = "abwesenheit_aggregate")
-public class AbwesenheitAggregate extends PanacheEntityBase implements space.maatini.eventsourcing.entity.AggregateRoot {
-    @Id public String id;
-    public String grund;
-    public UUID eventId;
-    @Version public Integer version;
-    public OffsetDateTime updatedAt;
-}
-```
-
-### Schritt 2: Event-Handler (Projection Layer)
+### Schritt 1: Handler schreiben
 
 ```java
 @ApplicationScoped
-@HandlesEvents(value = "space.maatini.abwesenheit.", aggregate = AbwesenheitAggregate.class)
-public class AbwesenheitHandler implements AggregateEventHandler<AbwesenheitAggregate> {
+@HandlesEvents(value = "space.maatini.abwesenheit.", aggregateType = "abwesenheit")
+public class AbwesenheitJsonHandler implements JsonAggregateHandler {
+    @Override public String getAggregateType() { return "abwesenheit"; }
 
-    @Override
-    public boolean canHandle(String eventType) {
-        return eventType.startsWith("space.maatini.abwesenheit.");
-    }
-
-    @Override
-    public Uni<Void> handle(CloudEvent event) {
-        // ... Logik zur Aktualisierung der AbwesenheitAggregate Entität
+    @Override public JsonObject apply(JsonObject state, CloudEvent event) {
+        JsonObject data = event.getData();
+        JsonObject newState = state.copy();
+        
+        if (event.getType().endsWith(".created")) {
+            newState.put("id", data.getString("id"));
+            newState.put("grund", data.getString("grund"));
+        }
+        return newState;
     }
 }
 ```
 
-### Schritt 3: Domain-Aggregat (Command Layer)
+### Schritt 2: Domain-Aggregat (Command Layer)
 
 ```java
-// Erbt von der Domänen-Basisklasse
 public class Abwesenheit extends space.maatini.eventsourcing.domain.AggregateRoot {
     public Abwesenheit(String id) { super(id); }
-
-    public void create(CreateAbwesenheitCommand cmd) {
-        if (getVersion() > 0) throw new IllegalStateException("Bereits erstellt");
-        // ... Event erzeugen und applyNewEvent() aufrufen
-    }
-
-    @Override protected void mutate(CloudEvent event) {
-        // Zustandsübergänge für das Replaying der Invarianten
-    }
+    // Invariant-Prüfung und Event-Erzeugung...
 }
 ```
 
-**Das war's.** Der `EventHandlerRegistry` erkennt den Handler automatisch beim Start.
+**Das war's.** Das Aggregat ist sofort unter `/aggregates/abwesenheit/{id}` abrufbar.
 
 ## Tests
 
