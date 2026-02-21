@@ -15,8 +15,8 @@ jobs:
         image: postgres:17
         env:
           POSTGRES_USER: runner
+          POSTGRES_PASSWORD: devpassword
           POSTGRES_DB: devdb
-          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -39,6 +39,7 @@ jobs:
       env:
         QUARKUS_DATASOURCE_REACTIVE_URL: postgresql://localhost:5432/devdb
         QUARKUS_DATASOURCE_USERNAME: runner
+        QUARKUS_DATASOURCE_PASSWORD: devpassword
         QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://localhost:5432/devdb
         QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION: none
         QUARKUS_FLYWAY_MIGRATE_AT_START: true

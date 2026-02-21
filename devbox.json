@@ -13,6 +13,7 @@
     "PGHOST":     "localhost",
     "PGPORT":     "5432",
     "PGUSER":     "$USER",
+    "PGPASSWORD": "devpassword",
     "PGDATABASE": "devdb"
   },
   "shell": {
@@ -35,7 +36,7 @@
       "pg:init": [
         "if [ ! -d \"$PGDATA\" ]; then",
         "  echo '📦 Initialisiere PostgreSQL Datenverzeichnis...'",
-        "  initdb -D \"$PGDATA\" --auth=trust --no-locale --encoding=UTF8",
+        "  initdb -D \"$PGDATA\" --auth=scram-sha-256 --no-locale --encoding=UTF8 --username=\"$PGUSER\" --pwfile=<(echo \"$PGPASSWORD\")",
         "  echo \"listen_addresses = 'localhost'\" >> \"$PGDATA/postgresql.conf\"",
         "  echo \"port = $PGPORT\" >> \"$PGDATA/postgresql.conf\"",
         "  echo '✅ PostgreSQL initialisiert'",

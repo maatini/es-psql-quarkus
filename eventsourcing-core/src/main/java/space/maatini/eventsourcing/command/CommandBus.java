@@ -29,21 +29,12 @@ public class CommandBus {
     @Inject
     public CommandBus(@Any Instance<CommandHandler<?, ?>> handlerInstances, AggregateSnapshotService snapshotService) {
         this.snapshotService = snapshotService;
-        for (CommandHandler<?, ?> handler : handlerInstances) {
-            Class<?> beanClass = handler.getClass();
-            // In Quarkus, the bean class might be a proxy. We need to find the actual annotation.
-            HandlesCommand annotation = null;
-            
-            // Try traversing class hierarchy if it's a proxy
-            Class<?> currentClass = beanClass;
-            while(currentClass != null && currentClass != Object.class) {
-                 annotation = currentClass.getAnnotation(HandlesCommand.class);
-                 if (annotation != null) break;
-                 currentClass = currentClass.getSuperclass();
-            }
+        for (Instance.Handle<CommandHandler<?, ?>> handle : handlerInstances.handles()) {
+            Class<?> beanClass = handle.getBean().getBeanClass();
+            HandlesCommand annotation = beanClass.getAnnotation(HandlesCommand.class);
 
             if (annotation != null) {
-                handlers.put(annotation.value(), handler);
+                handlers.put(annotation.value(), handle.get());
             } else {
                 throw new IllegalStateException("CommandHandler " + beanClass.getName() + " is missing @HandlesCommand annotation");
             }
