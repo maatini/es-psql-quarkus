@@ -12,7 +12,6 @@ data:
   QUARKUS_DATASOURCE_DB_KIND: "postgresql"
   QUARKUS_DATASOURCE_REACTIVE_URL: "postgresql://es-postgres:5432/esdb"
   QUARKUS_DATASOURCE_JDBC_URL: "jdbc:postgresql://es-postgres:5432/esdb"
-  QUARKUS_FLYWAY_MIGRATE_AT_START: "true"
 ---
 apiVersion: v1
 kind: Secret
