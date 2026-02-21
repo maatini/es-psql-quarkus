@@ -206,12 +206,12 @@ devbox run k6 run benchmarks/load-test.js
 
 | Metrik | Ergebnis |
 |--------|----------|
-| **Iterationen** | 14.962 (in 100 s) |
-| **Throughput** | ~149 Iterationen/s |
-| **HTTP-Requests gesamt** | 44.886 (∼448 req/s) |
-| **P90 Latency** | 4.75 ms |
-| **P95 Latency** | 5.47 ms ✅ (Threshold: < 100 ms) |
-| **P95 Latency (nur 2xx)** | 5.83 ms |
+| **Iterationen** | 14.687 (in 100 s) |
+| **Throughput** | ~146 Iterationen/s |
+| **HTTP-Requests gesamt** | 44.054 (∼440 req/s) |
+| **P90 Latency** | 6.47 ms |
+| **P95 Latency** | 7.7 ms ✅ (Threshold: < 100 ms) |
+| **P95 Latency (nur 2xx)** | 5.8 ms |
 | **Business Error Rate** | 0% |
 | **VUs** | 20 |
 
