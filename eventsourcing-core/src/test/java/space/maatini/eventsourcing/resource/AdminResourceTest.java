@@ -10,8 +10,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 
 /**
- * Core AdminResource tests — no Vertreter-specific dependencies.
- * Tests that require the Vertreter example are in example-vertreter module.
+ * Core AdminResource tests.
  */
 @QuarkusTest
 @io.quarkus.test.junit.TestProfile(space.maatini.eventsourcing.TestProfile.class)

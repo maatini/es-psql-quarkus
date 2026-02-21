@@ -107,14 +107,7 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 | `GET`  | `/aggregates/{type}`         | Alle Aggregate eines Typs          |
 | `GET`  | `/aggregates/{type}/{id}`    | Aggregat nach ID                   |
 
-### Vertreter Aggregates (Stage 1 – Tabellen-basiert)
-| Method | Path                                           | Beschreibung                  |
-|--------|------------------------------------------------|-------------------------------|
-| `GET`  | `/aggregates/vertreter`                        | Alle Vertreter                |
-| `GET`  | `/aggregates/vertreter/{id}`                   | Vertreter nach ID             |
-| `GET`  | `/aggregates/vertreter/email/{email}`          | Vertreter nach E-Mail         |
-| `GET`  | `/aggregates/vertreter/count`                  | Anzahl Vertreter              |
-| `GET`  | `/aggregates/vertreter/vertretene-person/{id}` | Vertreter einer Person        |
+
 
 ### Admin & Ops
 | Method | Path                        | Beschreibung                              |
@@ -165,11 +158,7 @@ src/main/java/space/maatini/eventsourcing/
 │   ├── OutboxScheduler.java           # 5s Poller (PENDING→SENT)
 │   ├── ProjectionService.java
 │   └── EventHandlerRegistry.java
-└── example/vertreter/               # Beispiel-Implementierung
-    ├── domain/Vertreter.java        # Aggregate (emitEvent)
-    ├── dto/command/                 # Command DTOs
-    ├── resource/                    # @RolesAllowed("user")
-    └── service/                     # @HandlesCommand Handler
+
 ```
 
 ## 🚀 Eigene Features entwickeln (Schritt-für-Schritt)
