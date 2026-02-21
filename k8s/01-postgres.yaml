@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: es-postgres
+  namespace: eventsourcing
+spec:
+  serviceName: es-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: es-postgres
+  template:
+    metadata:
+      labels:
+        app: es-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: es-db-credentials
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "esuser", "-d", "esdb"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: es-postgres
+  namespace: eventsourcing
+spec:
+  selector:
+    app: es-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None

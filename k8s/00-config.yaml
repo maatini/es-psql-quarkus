@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eventsourcing
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: es-app-config
+  namespace: eventsourcing
+data:
+  QUARKUS_DATASOURCE_DB_KIND: "postgresql"
+  QUARKUS_DATASOURCE_REACTIVE_URL: "postgresql://es-postgres:5432/esdb"
+  QUARKUS_DATASOURCE_JDBC_URL: "jdbc:postgresql://es-postgres:5432/esdb"
+  QUARKUS_OIDC_AUTH_SERVER_URL: "http://es-keycloak:8081/realms/es-framework"
+  QUARKUS_OIDC_CLIENT_ID: "backend-service"
+  QUARKUS_FLYWAY_MIGRATE_AT_START: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: es-db-credentials
+  namespace: eventsourcing
+type: Opaque
+stringData:
+  QUARKUS_DATASOURCE_USERNAME: "esuser"
+  QUARKUS_DATASOURCE_PASSWORD: "espass"
+  POSTGRES_USER: "esuser"
+  POSTGRES_PASSWORD: "espass"
+  POSTGRES_DB: "esdb"
