@@ -9,6 +9,8 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import space.maatini.eventsourcing.domain.DomainAggregateRoot;
 import space.maatini.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.service.AggregateSnapshotService;
+import io.vertx.core.json.JsonObject;
 
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
@@ -21,9 +23,11 @@ import java.util.Map;
 public class CommandBus {
 
     private final Map<Class<?>, CommandHandler<?, ?>> handlers = new HashMap<>();
+    private final AggregateSnapshotService snapshotService;
 
     @Inject
-    public CommandBus(@Any Instance<CommandHandler<?, ?>> handlerInstances) {
+    public CommandBus(@Any Instance<CommandHandler<?, ?>> handlerInstances, AggregateSnapshotService snapshotService) {
+        this.snapshotService = snapshotService;
         for (CommandHandler<?, ?> handler : handlerInstances) {
             Class<?> beanClass = handler.getClass();
             // In Quarkus, the bean class might be a proxy. We need to find the actual annotation.
@@ -66,21 +70,42 @@ public class CommandBus {
 
         return loadAggregate(aggregateId, aggregateClass)
                 .chain(aggregate -> handler.handle(aggregate, command))
-                .chain(aggregate -> saveEvents(aggregate));
+                .chain(aggregate -> {
+                    Uni<Void> saved = saveEvents(aggregate);
+                    // Create snapshot every 100 versions
+                    if (aggregate.getVersion() > 0 && aggregate.getVersion() % 100 == 0) {
+                        CloudEvent lastEvent = aggregate.getUncommittedEvents().getLast();
+                        return saved.chain(() -> snapshotService.saveSnapshot(aggregate, lastEvent.getId()));
+                    }
+                    return saved;
+                });
     }
 
     private <A extends DomainAggregateRoot> Uni<A> loadAggregate(String aggregateId, Class<A> aggregateClass) {
-        return CloudEvent.<CloudEvent>find("subject = ?1 ORDER BY createdAt ASC", aggregateId).list()
-                .map(events -> {
-                    try {
-                        Constructor<A> constructor = aggregateClass.getConstructor(String.class);
-                        A aggregate = constructor.newInstance(aggregateId);
-                        events.forEach(aggregate::apply);
-                        return aggregate;
-                    } catch (Exception e) {
-                        throw new RuntimeException("Failed to instantiate aggregate " + aggregateClass.getName(), e);
-                    }
-                });
+        return snapshotService.getLatestSnapshot(aggregateId, aggregateClass.getSimpleName())
+            .chain(snapshot -> {
+                int startOffset = snapshot != null ? snapshot.aggregateVersion : 0;
+                
+                return CloudEvent.<CloudEvent>find("subject = ?1 ORDER BY createdAt ASC", aggregateId)
+                        .range(startOffset, Integer.MAX_VALUE - 1)
+                        .list()
+                        .map(events -> {
+                            try {
+                                Constructor<A> constructor = aggregateClass.getConstructor(String.class);
+                                A aggregate = constructor.newInstance(aggregateId);
+                                
+                                if (snapshot != null) {
+                                    aggregate.restoreSnapshot(new JsonObject(snapshot.state));
+                                    aggregate.setVersion(snapshot.aggregateVersion);
+                                }
+                                
+                                events.forEach(aggregate::apply);
+                                return aggregate;
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to instantiate aggregate " + aggregateClass.getName(), e);
+                            }
+                        });
+            });
     }
 
     private Uni<Void> saveEvents(DomainAggregateRoot aggregate) {

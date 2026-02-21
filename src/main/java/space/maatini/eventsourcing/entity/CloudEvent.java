@@ -65,6 +65,9 @@ public class CloudEvent extends PanacheEntityBase {
     @Column(name = "error_message", columnDefinition = "text")
     private String errorMessage;
 
+    @Column(name = "data_version", nullable = false)
+    private Integer dataVersion = 1;
+
     // --- Getters & Setters ---
 
     public UUID getId() {
@@ -137,6 +140,14 @@ public class CloudEvent extends PanacheEntityBase {
 
     public void setData(JsonObject data) {
         this.data = data != null ? data.getMap() : null;
+    }
+
+    public Integer getDataVersion() {
+        return dataVersion;
+    }
+
+    public void setDataVersion(Integer dataVersion) {
+        this.dataVersion = dataVersion;
     }
 
     public OffsetDateTime getCreatedAt() {

@@ -18,6 +18,7 @@ public abstract class DomainAggregateRoot {
 
     public String getId() { return id; }
     public int getVersion() { return version; }
+    public void setVersion(int version) { this.version = version; }
     public List<CloudEvent> getUncommittedEvents() { return uncommittedEvents; }
 
     public void apply(CloudEvent event) {
@@ -53,6 +54,22 @@ public abstract class DomainAggregateRoot {
         event.setData(data);
         
         applyNewEvent(event);
+    }
+
+    /**
+     * Takes a snapshot of the aggregate's current state.
+     * Override this in your aggregate to support fast replays.
+     */
+    public JsonObject takeSnapshot() {
+        return new JsonObject();
+    }
+
+    /**
+     * Restores the aggregate's state from a snapshot.
+     * Override this in your aggregate to support fast replays.
+     */
+    public void restoreSnapshot(JsonObject snapshot) {
+        // Default no-op
     }
 
     protected abstract void mutate(CloudEvent event);

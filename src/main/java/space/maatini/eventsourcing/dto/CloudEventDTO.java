@@ -30,6 +30,8 @@ public record CloudEventDTO(
 
         @Schema(description = "Data schema URI") String dataschema,
 
+        @Schema(description = "Version of the data schema", defaultValue = "1") Integer dataVersion,
+
         @Schema(description = "Event payload", example = "{\"id\": \"v001\", \"name\": \"Max Mustermann\", \"email\": \"max@example.com\"}") @NotNull(message = "Event data is required") Map<String, Object> data) {
     /**
      * Apply defaults for optional fields.
@@ -44,6 +46,7 @@ public record CloudEventDTO(
                 time != null ? time : OffsetDateTime.now(),
                 datacontenttype != null ? datacontenttype : "application/json",
                 dataschema,
+                dataVersion != null ? dataVersion : 1,
                 data);
     }
 }

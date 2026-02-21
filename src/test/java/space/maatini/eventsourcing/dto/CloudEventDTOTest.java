@@ -45,6 +45,7 @@ class CloudEventDTOTest {
                     null, // time - optional
                     null, // datacontenttype - optional
                     null, // dataschema - optional
+                    1, // dataVersion
                     Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -63,6 +64,7 @@ class CloudEventDTOTest {
                     OffsetDateTime.now(),
                     "application/json",
                     "https://schema.example.com/vertreter.json",
+                    1, // dataVersion
                     Map.of("id", "v001", "name", "Test"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -81,6 +83,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1, // dataVersion
                     Map.of() // empty but not null
             );
 
@@ -105,6 +108,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1,
                     Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -124,6 +128,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1,
                     Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -143,6 +148,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1,
                     Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -161,6 +167,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1,
                     Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -180,6 +187,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1,
                     Map.of("key", "value"));
 
             Set<ConstraintViolation<CloudEventDTO>> violations = validator.validate(dto);
@@ -198,6 +206,7 @@ class CloudEventDTOTest {
                     null,
                     null,
                     null,
+                    1,
                     null // null data
             );
 
@@ -223,6 +232,7 @@ class CloudEventDTOTest {
                     null, // no time
                     null, // no datacontenttype
                     null, // no dataschema
+                    1, // dataVersion
                     Map.of("key", "value"));
 
             CloudEventDTO withDefaults = original.withDefaults();
@@ -247,6 +257,7 @@ class CloudEventDTOTest {
                     customTime,
                     "text/plain",
                     "https://schema.example.com",
+                    1,
                     Map.of("key", "value"));
 
             CloudEventDTO withDefaults = original.withDefaults();
