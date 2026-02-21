@@ -4,48 +4,62 @@
 
 ![Build Status](https://github.com/maatini/es-psql-quarkus/actions/workflows/ci.yml/badge.svg)
 
-**High-Performance Event Sourcing Template** mit Quarkus 3.31, CloudEvents und vollständigem **CQRS-Muster** via PostgreSQL LISTEN/NOTIFY.
+**High-Performance Event Sourcing Framework v2.0** mit Quarkus 3.31, CloudEvents und vollständigem **CQRS-Muster** via PostgreSQL LISTEN/NOTIFY.
 
 ## Architektur
 
 ```mermaid
 graph TD
     subgraph "Write Side (Command)"
-        CMD["REST API<br/>(VertreterCommandResource)<br/>POST /commands/vertreter"] --> CS["VertreterCommandService"]
-        CS --> |"Replay-Invariant-Prüfung"| VA["Vertreter<br/>(Domain Aggregate)"]
-        VA --> |"Neue Events"| ES_RAW["EventService<br/>POST /events"]
-        ES_RAW --> |"INSERT"| DB_Events[("PostgreSQL<br/>events table")]
+        CMD["REST API<br/>(VertreterCommandResource)<br/>POST /commands/vertreter"] --> CB["CommandBus"]
+        CB --> |"Load + Snapshot"| VA["Vertreter<br/>(DomainAggregateRoot)"]
+        VA --> |"Neue Events"| CB
+        CB --> |"INSERT Events"| DB_Events[("events")]
+        CB --> |"INSERT Outbox"| DB_Outbox[("outbox_events")]
+        CB --> |"Snapshot @ N=100"| DB_Snap[("aggregate_snapshots")]
     end
 
     subgraph "Database Layer"
-        DB_Events --> |"TRIGGER (After Insert)"| DB_Notify["NOTIFY events_channel"]
+        DB_Events --> |"TRIGGER"| DB_Notify["NOTIFY events_channel"]
+    end
+
+    subgraph "Outbox (Garantierte Zustellung)"
+        SCHED["OutboxScheduler<br/>(5s Polling)"] --> |"PENDING → SENT"| DB_Outbox
+        SCHED -.-> |"Kafka / RabbitMQ"| EXT["Externe Systeme"]
     end
 
     subgraph "Async Projection"
-        DB_Notify --> |"LISTEN"| PROJ["ProjectionService<br/>+ Handler Registry"]
-        PROJ --> |"Handler Pattern (Stage 1)"| DB_Agg[("PostgreSQL<br/>vertreter_aggregate")]
-        PROJ --> |"JSON Handler (Stage 2)"| DB_Generic[("PostgreSQL<br/>aggregate_states")]
+        DB_Notify --> |"LISTEN"| PROJ["ProjectionService"]
+        PROJ --> |"Handler (Stage 1)"| DB_Agg[("vertreter_aggregate")]
+        PROJ --> |"JSON Handler (Stage 2)"| DB_Generic[("aggregate_states")]
     end
 
     subgraph "Read Side (Query)"
-        API_R["REST API<br/>(VertreterAggregateResource)<br/>GET /aggregates"] --> AS["VertreterAggregateService"]
-        AS --> |"SELECT"| DB_Agg
-        API_G["Generic API<br/>(GenericAggregateResource)<br/>GET /aggregates/{type}"] --> GS["GenericAggregateService"]
-        GS --> |"JSON Query"| DB_Generic
+        API_G["GenericAggregateResource<br/>GET /aggregates/{type}"] --> GS["GenericAggregateService"]
+        GS --> DB_Generic
+    end
+
+    subgraph "Security"
+        OIDC["Keycloak (OIDC/JWT)"] --> CMD
+        OIDC --> API_G
     end
 
     classDef java fill:#2C3E50,stroke:#fff,stroke-width:2px,color:#fff;
     classDef db fill:#27AE60,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef ext fill:#8E44AD,stroke:#fff,stroke-width:2px,color:#fff;
 
-    class CMD,CS,VA,ES_RAW,API_R,AS,PROJ,API_G,GS java;
-    class DB_Events,DB_Agg,DB_Notify,DB_Generic db;
+    class CMD,CB,VA,API_G,GS,PROJ,SCHED java;
+    class DB_Events,DB_Agg,DB_Notify,DB_Generic,DB_Outbox,DB_Snap db;
+    class OIDC,EXT ext;
 ```
 
 **Kernprinzipien:**
-- **Commands** prüfen Invarianten (Aggregate-Replay) bevor Events gespeichert werden
-- **SQL-Triggers** nur noch für NOTIFY – die gesamte Aggregationslogik liegt in Java
-- **Dual-Mode Read-Model**: Unterstützt sowohl klassische Tabellen (Stufe 1) als auch generisches JSONB (Stufe 2)
-- **Optimistic Locking** via JPA `@Version` – verhindert Race Conditions
+- **Generic CommandBus** routet Commands an registrierte `CommandHandler` via `@HandlesCommand`
+- **Aggregate Snapshots** reduzieren Replay-Overhead (automatisch alle 100 Versionen)
+- **Transactional Outbox Pattern** garantiert zuverlässige Event-Zustellung
+- **OIDC/JWT Security** via Keycloak mit `@RolesAllowed`-Absicherung
+- **Dual-Mode Read-Model**: klassische Tabellen (Stufe 1) und generisches JSONB (Stufe 2)
+- **Event Versioning** über `dataVersion` für sichere Schema-Evolution
 
 ## Voraussetzungen
 
@@ -109,54 +123,50 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 
 ## Features
 
-- **True CQRS** – Command-Side mit Domänen-Aggregaten und Invariant-Prüfung
+- **Generic CommandBus** mit `@HandlesCommand`-Annotation für Zero-Boilerplate Command Routing
+- **Aggregate Snapshotting** – Replay-Optimierung ab 100 Events
+- **Transactional Outbox Pattern** – garantierte Event-Zustellung mit `OutboxScheduler`
+- **Event Versioning** über `dataVersion` für Schema-Evolution
+- **OIDC/JWT Security** via Keycloak mit `@RolesAllowed`
+- **True CQRS** – Command-Side mit DomainAggregateRoot und Invariant-Prüfung
 - Near-Realtime Updates durch PostgreSQL LISTEN/NOTIFY
 - **Vollständig generisches JSON-basiertes Read-Model (Stufe 2)**
 - Vollständige Revisionssicherheit (unveränderlicher Event-Log)
-- **Optimistic Locking** (JPA `@Version`) für Race Condition-Schutz
-- **DB Constraints**: `UNIQUE(email)`, `CHECK (version >= 0)`
-- Handler-Pattern für beliebig viele Aggregate
 - Replay-Fähigkeit (kompletter Neuaufbau beider Read-Models)
 - **Robustes Error Handling**: Automatischer Retry & Dead-Letter-Logik
 - **Monitoring**: Micrometer/Prometheus + Custom HealthChecks
-- Umfassende Test-Suite (72 Tests) – voll isoliert via `@BeforeEach`-DB-Wipe
+- **Docker Compose** + **Kubernetes-Manifeste** für Production-Deployments
+- Umfassende Test-Suite (45 Tests) mit `@TestProfile` und `@TestSecurity`
 - Devbox-Komplettumgebung
 
 ## Paketstruktur
 
 ```
 src/main/java/space/maatini/eventsourcing/
-├── domain/                   # Domänen-Aggregate (Invarianten, Schreib-Logik)
-│   └── AggregateRoot.java    # Basisklasse für Domain-Aggregate
+├── command/                  # Generic Command Routing
+│   ├── CommandBus.java       # Zentraler Dispatcher (Load/Handle/Save)
+│   ├── CommandHandler.java   # Handler-Interface
+│   └── HandlesCommand.java   # Annotation für Handler-Discovery
+├── domain/
+│   └── DomainAggregateRoot.java # Basis: emitEvent(), takeSnapshot(), restoreSnapshot()
 ├── dto/
-├── entity/                   # JPA Read-Models (Projektions-Tabellen)
-│   ├── AggregateRoot.java    # Marker-Interface für Entitäten
-│   ├── JsonAggregate.java    # Generisches JSON-Read-Model (Stufe 2)
-│   ├── CloudEvent.java
-│   └── VertreterAggregate.java
-├── resource/                 # REST-Endpunkte
-│   ├── GenericAggregateResource.java # Generische API (Stufe 2)
-│   ├── EventResource.java
-│   └── AdminResource.java
-└── service/                  # Applikationslogik & Handler
-    ├── JsonAggregateHandler.java # Basis für generische Handler (Stufe 2)
-    ├── ProjectionService.java          # Facade
-    ├── EventBatchProcessor.java
-    ├── EventHandlerRegistry.java
-    ├── ProjectionReplayService.java
-    └── EventNotificationListener.java  # PG LISTEN (deaktiviert im Test-Profil)
-└── example/
-    └── vertreter/            # Beispiel-Implementierung
-        ├── domain/           # Domänen-Logik (Aggregate)
-        │   └── Vertreter.java
-        ├── dto/command/      # Beispiel-Commands
-        │   ├── CreateVertreterCommand.java
-        │   └── UpdateVertreterCommand.java
-        ├── resource/         # API-Endpunkte für das Beispiel
-        │   └── VertreterCommandResource.java
-        └── service/          # Handler & Services für das Beispiel
-            ├── VertreterCommandService.java
-            └── VertreterJsonHandler.java
+├── entity/
+│   ├── AggregateRoot.java       # Marker-Interface (JPA)
+│   ├── AggregateSnapshot.java   # Snapshot-Persistenz
+│   ├── CloudEvent.java          # Event-Store (+ dataVersion)
+│   ├── JsonAggregate.java       # Generisches JSON-Read-Model (Stufe 2)
+│   └── OutboxEvent.java         # Transactional Outbox
+├── resource/                    # REST-Endpunkte (@RolesAllowed)
+├── service/
+│   ├── AggregateSnapshotService.java  # Snapshot CRUD
+│   ├── OutboxScheduler.java           # 5s Poller (PENDING→SENT)
+│   ├── ProjectionService.java
+│   └── EventHandlerRegistry.java
+└── example/vertreter/               # Beispiel-Implementierung
+    ├── domain/Vertreter.java        # Aggregate (emitEvent)
+    ├── dto/command/                 # Command DTOs
+    ├── resource/                    # @RolesAllowed("user")
+    └── service/                     # @HandlesCommand Handler
 ```
 
 ## 🚀 Eigene Features entwickeln (Schritt-für-Schritt)
@@ -164,112 +174,70 @@ src/main/java/space/maatini/eventsourcing/
 Dieses Template nutzt CQRS – das bedeutet, das **Schreiben von Daten (Commands)** und das **Lesen von Daten (Queries/Projections)** ist strikt getrennt. 
 Hier ist ein komplettes Tutorial, wie du ein neues Feature (z.B. ein Fahrzeug) hinzufügst.
 
-### Schritt 1: Domain-Aggregat erstellen (Command Layer)
-Das Aggregat ist der Wächter deiner Geschäftslogik. Hier werden Befehle entgegengenommen, validiert (die sogenannten Invarianten) und bei Erfolg in unveränderliche **Events** übersetzt.
+### Schritt 1: Domain-Aggregat erstellen
+Das Aggregat ist der Wächter deiner Geschäftslogik. Nutze `emitEvent()` für saubere Event-Erzeugung.
 
 ```java
 package space.maatini.eventsourcing.example.fahrzeug.domain;
 
-import space.maatini.eventsourcing.domain.AggregateRoot;
+import space.maatini.eventsourcing.domain.DomainAggregateRoot;
 import space.maatini.eventsourcing.entity.CloudEvent;
 import io.vertx.core.json.JsonObject;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
-public class Fahrzeug extends AggregateRoot {
+public class Fahrzeug extends DomainAggregateRoot {
     private boolean registered = false;
 
-    public Fahrzeug(String id) {
-        super(id);
-    }
+    public Fahrzeug(String id) { super(id); }
 
-    // Command-Funktion
     public void register(String marke, String kennzeichen) {
-        if (registered) throw new IllegalStateException("Fahrzeug ist bereits registriert!");
-        if (kennzeichen == null || kennzeichen.isBlank()) throw new IllegalArgumentException("Kennzeichen fehlt!");
-
-        // Event generieren
-        CloudEvent event = new CloudEvent();
-        event.setId(UUID.randomUUID());
-        event.setType("space.maatini.fahrzeug.registered"); // Eindeutiger Event-Typ
-        event.setSubject(getId());
-        event.setData(new JsonObject().put("id", getId()).put("marke", marke).put("kennzeichen", kennzeichen));
-        event.setTime(OffsetDateTime.now());
-
-        applyNewEvent(event);
+        if (registered) throw new IllegalStateException("Bereits registriert!");
+        emitEvent("space.maatini.fahrzeug.registered",
+                  new JsonObject().put("id", getId()).put("marke", marke).put("kennzeichen", kennzeichen));
     }
 
-    // State updaten für nachfolgende Prüfungen (Replay)
     @Override
     protected void mutate(CloudEvent event) {
-        if ("space.maatini.fahrzeug.registered".equals(event.getType())) {
-            this.registered = true;
-        }
+        if (event.getType().endsWith(".registered")) this.registered = true;
     }
 }
 ```
 
-### Schritt 2: API Endpunkt (Resource) definieren
-Erstelle die REST-API, um den Befehl von außen entgegenzunehmen.
-
-```java
-package space.maatini.eventsourcing.example.fahrzeug.resource;
-
-import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.Response;
-import io.smallrye.mutiny.Uni;
-import space.maatini.eventsourcing.example.fahrzeug.service.FahrzeugCommandService;
-
-@Path("/commands/fahrzeuge")
-public class FahrzeugCommandResource {
-    
-    @Inject FahrzeugCommandService service;
-
-    public record RegisterCommand(String id, String marke, String kennzeichen) {}
-
-    @POST
-    public Uni<Response> register(RegisterCommand cmd) {
-        return service.registerFahrzeug(cmd)
-                .replaceWith(Response.status(Response.Status.ACCEPTED).build());
-    }
-}
-```
-
-### Schritt 3: Command Service implementieren
-Der Service lädt die bisherigen Events (falls vorhanden), wendet den neuen Befehl an und speichert das resultierende Event transaktional in die Datenbank.
+### Schritt 2: Command Handler erstellen
+Kein manuelles Aggregate-Loading mehr – der `CommandBus` übernimmt alles.
 
 ```java
 package space.maatini.eventsourcing.example.fahrzeug.service;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.Multi;
-import space.maatini.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.command.*;
 import space.maatini.eventsourcing.example.fahrzeug.domain.Fahrzeug;
-import space.maatini.eventsourcing.example.fahrzeug.resource.FahrzeugCommandResource.RegisterCommand;
+
+public record RegisterFahrzeugCommand(String id, String marke, String kennzeichen) {}
 
 @ApplicationScoped
-public class FahrzeugCommandService {
+@HandlesCommand(RegisterFahrzeugCommand.class)
+public class RegisterFahrzeugHandler implements CommandHandler<Fahrzeug, RegisterFahrzeugCommand> {
+    @Override
+    public Uni<Fahrzeug> handle(Fahrzeug fahrzeug, RegisterFahrzeugCommand cmd) {
+        fahrzeug.register(cmd.marke(), cmd.kennzeichen());
+        return Uni.createFrom().item(fahrzeug);
+    }
+}
+```
 
-    @WithTransaction
-    public Uni<Void> registerFahrzeug(RegisterCommand cmd) {
-        // 1. Alle echten bisherigen Events laden (hier oft leer bei Neuanlage)
-        return CloudEvent.<CloudEvent>find("subject = ?1 ORDER BY createdAt ASC", cmd.id()).list()
-            .chain(events -> {
-                // 2. Aggregat aufbauen
-                Fahrzeug fahrzeug = new Fahrzeug(cmd.id());
-                events.forEach(fahrzeug::apply); 
-                
-                // 3. Command ausführen (Validierung)
-                fahrzeug.register(cmd.marke(), cmd.kennzeichen());
-                
-                // 4. Neue Events speichern
-                return Multi.createFrom().iterable(fahrzeug.getUncommittedEvents())
-                        .onItem().transformToUniAndConcatenate(event -> event.persist())
-                        .collect().last().replaceWithVoid();
-            });
+### Schritt 3: REST Resource + CommandBus
+
+```java
+@Path("/commands/fahrzeuge")
+@RolesAllowed("user")
+public class FahrzeugCommandResource {
+    @Inject CommandBus commandBus;
+
+    @POST
+    public Uni<Response> register(RegisterFahrzeugCommand cmd) {
+        return commandBus.dispatch(cmd.id(), Fahrzeug.class, cmd)
+                .replaceWith(Response.status(201).build());
     }
 }
 ```
@@ -362,6 +330,20 @@ devbox run k6 run benchmarks/load-test.js
 - Multi-Instance-fähig (`FOR UPDATE SKIP LOCKED`)
 - Native Executable unterstützt (GraalVM)
 - `UNIQUE` + optimistic Locking schützen vor Race Conditions
+
+## Deployment
+
+### Docker Compose
+```bash
+# Build + Start (PostgreSQL + Keycloak + App)
+./mvnw package -DskipTests
+docker compose up --build
+```
+
+### Kubernetes
+```bash
+kubectl apply -f k8s/
+```
 
 ---
 
