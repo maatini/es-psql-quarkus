@@ -21,8 +21,12 @@ import jakarta.persistence.Table;
  * @see <a href="https://github.com/cloudevents/spec">CloudEvents
  *      Specification</a>
  */
+import jakarta.persistence.UniqueConstraint;
+
 @Entity
-@Table(name = "events")
+@Table(name = "events", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_events_concurrency", columnNames = {"subject", "aggregate_version"})
+})
 public class CloudEvent extends PanacheEntityBase {
 
     @Id
