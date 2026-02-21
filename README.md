@@ -112,13 +112,15 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 ```
 src/main/java/space/maatini/eventsourcing/
 ├── domain/                   # Domänen-Aggregate (Invarianten, Schreib-Logik)
-│   ├── AggregateRoot.java
+│   ├── AggregateRoot.java    # Basisklasse für Domain-Aggregate
 │   └── Vertreter.java
 ├── dto/
 │   └── command/              # Command-DTOs
 │       ├── CreateVertreterCommand.java
-│       └── UpdateVertreterCommand.java
+│       ├── UpdateVertreterCommand.java
+│       └── VertretenePersonCommandDTO.java
 ├── entity/                   # JPA Read-Models (Projektions-Tabellen)
+│   ├── AggregateRoot.java    # Marker-Interface für Entitäten
 │   ├── CloudEvent.java
 │   └── VertreterAggregate.java
 ├── resource/                 # REST-Endpunkte
@@ -129,6 +131,7 @@ src/main/java/space/maatini/eventsourcing/
 └── service/                  # Applikationslogik & Handler
     ├── VertreterCommandService.java
     ├── VertreterCreatedOrUpdatedHandler.java
+    ├── VertreterDeletedHandler.java
     ├── ProjectionService.java          # Facade
     ├── EventBatchProcessor.java
     ├── EventHandlerRegistry.java
@@ -138,7 +141,7 @@ src/main/java/space/maatini/eventsourcing/
 
 ## Neues Aggregat hinzufügen
 
-### Schritt 1: Flyway-Migration & Read-Model
+### Schritt 1: Flyway-Migration & Read-Model (Entity Layer)
 
 ```sql
 -- src/main/resources/db/migration/V11__abwesenheit.sql
@@ -152,8 +155,9 @@ CREATE TABLE abwesenheit_aggregate (
 ```
 
 ```java
+// Entität implementiert das Marker-Interface
 @Entity @Table(name = "abwesenheit_aggregate")
-public class AbwesenheitAggregate extends PanacheEntityBase implements AggregateRoot {
+public class AbwesenheitAggregate extends PanacheEntityBase implements space.maatini.eventsourcing.entity.AggregateRoot {
     @Id public String id;
     public String grund;
     public UUID eventId;
@@ -162,7 +166,7 @@ public class AbwesenheitAggregate extends PanacheEntityBase implements Aggregate
 }
 ```
 
-### Schritt 2: Event-Handler
+### Schritt 2: Event-Handler (Projection Layer)
 
 ```java
 @ApplicationScoped
@@ -176,35 +180,25 @@ public class AbwesenheitHandler implements AggregateEventHandler<AbwesenheitAggr
 
     @Override
     public Uni<Void> handle(CloudEvent event) {
-        JsonObject data = event.getData();
-        String id = data.getString("id");
-        return AbwesenheitAggregate.<AbwesenheitAggregate>findById(id)
-            .chain(existing -> {
-                boolean isNew = existing == null;
-                AbwesenheitAggregate agg = isNew ? new AbwesenheitAggregate() : existing;
-                if (isNew) agg.id = id;
-                agg.grund = data.getString("grund");
-                agg.updatedAt = event.getTime();
-                agg.eventId = event.getId();
-                return isNew ? agg.persist() : Uni.createFrom().item(agg);
-            }).replaceWithVoid();
+        // ... Logik zur Aktualisierung der AbwesenheitAggregate Entität
     }
 }
 ```
 
-### Schritt 3: Domain-Aggregat (für Commands)
+### Schritt 3: Domain-Aggregat (Command Layer)
 
 ```java
-public class Abwesenheit extends AggregateRoot {
+// Erbt von der Domänen-Basisklasse
+public class Abwesenheit extends space.maatini.eventsourcing.domain.AggregateRoot {
     public Abwesenheit(String id) { super(id); }
 
     public void create(CreateAbwesenheitCommand cmd) {
-        if (isCreated()) throw new IllegalStateException("Bereits erstellt");
+        if (getVersion() > 0) throw new IllegalStateException("Bereits erstellt");
         // ... Event erzeugen und applyNewEvent() aufrufen
     }
 
     @Override protected void mutate(CloudEvent event) {
-        // Zustandsübergänge
+        // Zustandsübergänge für das Replaying der Invarianten
     }
 }
 ```
@@ -221,13 +215,24 @@ public class Abwesenheit extends AggregateRoot {
 devbox run k6 run benchmarks/load-test.js
 ```
 
-### Performance (M1 Max Local)
+### Performance (Linux Devbox – aktuelle Messung 21.02.2026)
 
 | Metrik | Ergebnis |
 |--------|----------|
-| **Throughput** | ~153 req/s |
-| **P95 Latency** | 9.37 ms |
-| **Error Rate** | 0% |
+| **Iterationen** | 14.962 (in 100 s) |
+| **Throughput** | ~149 Iterationen/s |
+| **HTTP-Requests gesamt** | 44.886 (∼448 req/s) |
+| **P90 Latency** | 4.75 ms |
+| **P95 Latency** | 5.47 ms ✅ (Threshold: < 100 ms) |
+| **P95 Latency (nur 2xx)** | 5.83 ms |
+| **Business Error Rate** | 0% |
+| **VUs** | 20 |
+
+> **Hinweis zur Poll-Rate (~33% HTTP-Fails):** Der Load-Test pollt `GET /aggregates` nach jedem
+> `POST /events` bis die Projektion fertig ist (Eventual Consistency). Diese 404-Antworten
+> sind kein Fehler — Business-Error-Rate = **0%**.
+
+*Messung auf Linux x86-64 (Devbox), PostgreSQL lokal.*
 
 ## Devbox Befehle
 
