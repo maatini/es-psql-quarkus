@@ -19,6 +19,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  * Tests cover happy path, validation edge cases, and boundary conditions.
  */
 @QuarkusTest
+@io.quarkus.test.junit.TestProfile(space.maatini.eventsourcing.TestProfile.class)
 @io.quarkus.test.security.TestSecurity(user = "test", roles = {"user", "admin"})
 class EventResourceTest {
 
