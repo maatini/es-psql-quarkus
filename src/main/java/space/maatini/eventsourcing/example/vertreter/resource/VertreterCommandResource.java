@@ -8,7 +8,9 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import space.maatini.eventsourcing.example.vertreter.dto.command.CreateVertreterCommand;
 import space.maatini.eventsourcing.example.vertreter.dto.command.UpdateVertreterCommand;
-import space.maatini.eventsourcing.example.vertreter.service.VertreterCommandService;
+import space.maatini.eventsourcing.command.CommandBus;
+import space.maatini.eventsourcing.example.vertreter.domain.Vertreter;
+import space.maatini.eventsourcing.example.vertreter.dto.command.DeleteVertreterCommand;
 
 @Path("/commands/vertreter")
 @Produces(MediaType.APPLICATION_JSON)
@@ -16,10 +18,10 @@ import space.maatini.eventsourcing.example.vertreter.service.VertreterCommandSer
 @Tag(name = "Command Resource", description = "Endpoints for executing business commands on Vertreter aggregates")
 public class VertreterCommandResource {
 
-    private final VertreterCommandService commandService;
+    private final CommandBus commandBus;
 
-    public VertreterCommandResource(VertreterCommandService commandService) {
-        this.commandService = commandService;
+    public VertreterCommandResource(CommandBus commandBus) {
+        this.commandBus = commandBus;
     }
 
     @POST
@@ -28,7 +30,7 @@ public class VertreterCommandResource {
         if (command == null || command.id() == null) {
             return Uni.createFrom().item(Response.status(Response.Status.BAD_REQUEST).entity("Missing command ID").build());
         }
-        return commandService.createVertreter(command)
+        return commandBus.dispatch(command.id(), Vertreter.class, command)
                 .map(v -> Response.status(Response.Status.CREATED).build())
                 .onFailure(IllegalStateException.class).recoverWithItem(e -> 
                         Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build());
@@ -44,7 +46,7 @@ public class VertreterCommandResource {
         if (!id.equals(command.id())) {
             return Uni.createFrom().item(Response.status(Response.Status.BAD_REQUEST).entity("ID mismatch").build());
         }
-        return commandService.updateVertreter(command)
+        return commandBus.dispatch(command.id(), Vertreter.class, command)
                 .map(v -> Response.ok().build())
                 .onFailure(IllegalStateException.class).recoverWithItem(e -> 
                         Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build());
@@ -54,7 +56,8 @@ public class VertreterCommandResource {
     @Path("/{id}")
     @Operation(summary = "Delete an existing Vertreter")
     public Uni<Response> delete(@PathParam("id") String id) {
-        return commandService.deleteVertreter(id)
+        DeleteVertreterCommand command = new DeleteVertreterCommand(id);
+        return commandBus.dispatch(id, Vertreter.class, command)
                 .map(v -> Response.ok().build())
                 .onFailure(IllegalStateException.class).recoverWithItem(e -> 
                         Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build());

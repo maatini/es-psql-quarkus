@@ -1,14 +1,13 @@
 package space.maatini.eventsourcing.example.vertreter.domain;
 
-import space.maatini.eventsourcing.domain.AggregateRoot;
+import space.maatini.eventsourcing.domain.DomainAggregateRoot;
 import space.maatini.eventsourcing.entity.CloudEvent;
 import space.maatini.eventsourcing.example.vertreter.dto.command.CreateVertreterCommand;
 import space.maatini.eventsourcing.example.vertreter.dto.command.UpdateVertreterCommand;
+import space.maatini.eventsourcing.example.vertreter.dto.command.DeleteVertreterCommand;
 import io.vertx.core.json.JsonObject;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
-public class Vertreter extends AggregateRoot {
+public class Vertreter extends DomainAggregateRoot {
     private boolean deleted = false;
     private boolean created = false;
 
@@ -30,15 +29,7 @@ public class Vertreter extends AggregateRoot {
                  .put("name", cmd.vertretenePerson().name()));
         }
 
-        CloudEvent event = new CloudEvent();
-        event.setId(UUID.randomUUID());
-        event.setType("space.maatini.vertreter.created");
-        event.setSource("/commands/vertreter");
-        event.setSubject(cmd.id());
-        event.setTime(OffsetDateTime.now());
-        event.setData(data);
-
-        applyNewEvent(event);
+        emitEvent("space.maatini.vertreter.created", data);
     }
 
     public void update(UpdateVertreterCommand cmd) {
@@ -54,31 +45,15 @@ public class Vertreter extends AggregateRoot {
                  .put("name", cmd.vertretenePerson().name()));
         }
 
-        CloudEvent event = new CloudEvent();
-        event.setId(UUID.randomUUID());
-        event.setType("space.maatini.vertreter.updated");
-        event.setSource("/commands/vertreter");
-        event.setSubject(cmd.id());
-        event.setTime(OffsetDateTime.now());
-        event.setData(data);
-
-        applyNewEvent(event);
+        emitEvent("space.maatini.vertreter.updated", data);
     }
 
-    public void delete() {
+    public void delete(DeleteVertreterCommand cmd) {
         if (!created) throw new IllegalStateException("Vertreter does not exist");
         if (deleted) throw new IllegalStateException("Vertreter was already deleted");
 
-        JsonObject data = new JsonObject().put("id", getId());
-        CloudEvent event = new CloudEvent();
-        event.setId(UUID.randomUUID());
-        event.setType("space.maatini.vertreter.deleted");
-        event.setSource("/commands/vertreter");
-        event.setSubject(getId());
-        event.setTime(OffsetDateTime.now());
-        event.setData(data);
-
-        applyNewEvent(event);
+        JsonObject data = new JsonObject().put("id", cmd.id());
+        emitEvent("space.maatini.vertreter.deleted", data);
     }
 
     @Override
