@@ -1,8 +1,9 @@
-package space.maatini.eventsourcing.domain;
+package space.maatini.eventsourcing.example.vertreter.domain;
 
+import space.maatini.eventsourcing.domain.AggregateRoot;
 import space.maatini.eventsourcing.entity.CloudEvent;
-import space.maatini.eventsourcing.dto.command.CreateVertreterCommand;
-import space.maatini.eventsourcing.dto.command.UpdateVertreterCommand;
+import space.maatini.eventsourcing.example.vertreter.dto.command.CreateVertreterCommand;
+import space.maatini.eventsourcing.example.vertreter.dto.command.UpdateVertreterCommand;
 import io.vertx.core.json.JsonObject;
 import java.time.OffsetDateTime;
 import java.util.UUID;

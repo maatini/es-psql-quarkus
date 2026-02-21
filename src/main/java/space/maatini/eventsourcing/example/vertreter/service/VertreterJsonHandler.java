@@ -1,8 +1,10 @@
-package space.maatini.eventsourcing.service;
+package space.maatini.eventsourcing.example.vertreter.service;
 
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
 import space.maatini.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.service.HandlesEvents;
+import space.maatini.eventsourcing.service.JsonAggregateHandler;
 
 @ApplicationScoped
 @HandlesEvents(value = "space.maatini.vertreter.", aggregateType = "vertreter")

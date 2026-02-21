@@ -1,4 +1,4 @@
-package space.maatini.eventsourcing.resource;
+package space.maatini.eventsourcing.example.vertreter.resource;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;

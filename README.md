@@ -125,13 +125,8 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 ```
 src/main/java/space/maatini/eventsourcing/
 ├── domain/                   # Domänen-Aggregate (Invarianten, Schreib-Logik)
-│   ├── AggregateRoot.java    # Basisklasse für Domain-Aggregate
-│   └── Vertreter.java
+│   └── AggregateRoot.java    # Basisklasse für Domain-Aggregate
 ├── dto/
-│   └── command/              # Command-DTOs
-│       ├── CreateVertreterCommand.java
-│       ├── UpdateVertreterCommand.java
-│       └── VertretenePersonCommandDTO.java
 ├── entity/                   # JPA Read-Models (Projektions-Tabellen)
 │   ├── AggregateRoot.java    # Marker-Interface für Entitäten
 │   ├── JsonAggregate.java    # Generisches JSON-Read-Model (Stufe 2)
@@ -139,21 +134,27 @@ src/main/java/space/maatini/eventsourcing/
 │   └── VertreterAggregate.java
 ├── resource/                 # REST-Endpunkte
 │   ├── GenericAggregateResource.java # Generische API (Stufe 2)
-│   ├── VertreterCommandResource.java
-│   ├── VertreterAggregateResource.java
 │   ├── EventResource.java
 │   └── AdminResource.java
 └── service/                  # Applikationslogik & Handler
     ├── JsonAggregateHandler.java # Basis für generische Handler (Stufe 2)
-    ├── VertreterJsonHandler.java # Beispiel generischer Handler
-    ├── VertreterCommandService.java
-    ├── VertreterCreatedOrUpdatedHandler.java # Stufe 1 Handler
-    ├── VertreterDeletedHandler.java
     ├── ProjectionService.java          # Facade
     ├── EventBatchProcessor.java
     ├── EventHandlerRegistry.java
     ├── ProjectionReplayService.java
     └── EventNotificationListener.java  # PG LISTEN (deaktiviert im Test-Profil)
+└── example/
+    └── vertreter/            # Beispiel-Implementierung
+        ├── domain/           # Domänen-Logik (Aggregate)
+        │   └── Vertreter.java
+        ├── dto/command/      # Beispiel-Commands
+        │   ├── CreateVertreterCommand.java
+        │   └── UpdateVertreterCommand.java
+        ├── resource/         # API-Endpunkte für das Beispiel
+        │   └── VertreterCommandResource.java
+        └── service/          # Handler & Services für das Beispiel
+            ├── VertreterCommandService.java
+            └── VertreterJsonHandler.java
 ```
 
 ## Neues Aggregat hinzufügen (Stufe 2 - Generisch)

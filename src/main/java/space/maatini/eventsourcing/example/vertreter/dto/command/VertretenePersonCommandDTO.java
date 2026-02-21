@@ -1,4 +1,4 @@
-package space.maatini.eventsourcing.dto.command;
+package space.maatini.eventsourcing.example.vertreter.dto.command;
 
 public record VertretenePersonCommandDTO(
     String id,

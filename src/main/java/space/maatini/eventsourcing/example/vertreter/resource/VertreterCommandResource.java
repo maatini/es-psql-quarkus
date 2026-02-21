@@ -1,4 +1,4 @@
-package space.maatini.eventsourcing.resource;
+package space.maatini.eventsourcing.example.vertreter.resource;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.*;
@@ -6,9 +6,9 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import space.maatini.eventsourcing.dto.command.CreateVertreterCommand;
-import space.maatini.eventsourcing.dto.command.UpdateVertreterCommand;
-import space.maatini.eventsourcing.service.VertreterCommandService;
+import space.maatini.eventsourcing.example.vertreter.dto.command.CreateVertreterCommand;
+import space.maatini.eventsourcing.example.vertreter.dto.command.UpdateVertreterCommand;
+import space.maatini.eventsourcing.example.vertreter.service.VertreterCommandService;
 
 @Path("/commands/vertreter")
 @Produces(MediaType.APPLICATION_JSON)
