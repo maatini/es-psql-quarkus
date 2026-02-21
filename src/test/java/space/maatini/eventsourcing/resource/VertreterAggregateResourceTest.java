@@ -4,9 +4,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 
 import java.util.UUID;
 
@@ -21,8 +18,15 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  * Each test creates its own test data to be independent.
  */
 @QuarkusTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class VertreterAggregateResourceTest {
+
+    @org.junit.jupiter.api.BeforeEach
+    void cleanup() {
+        io.restassured.RestAssured.given()
+            .post("/test-support/wipe")
+            .then()
+            .statusCode(200);
+    }
 
     private static final String AGGREGATES_PATH = "/aggregates/vertreter";
     private static final String EVENTS_PATH = "/events";
@@ -45,7 +49,6 @@ class VertreterAggregateResourceTest {
     // ==================== HAPPY PATH TESTS ====================
 
     @Test
-    @Order(1)
     @DisplayName("GET /aggregates/vertreter/{id} - Existing aggregate returns 200")
     void getExistingAggregate_returns200() {
         String testId = "get-test-" + UUID.randomUUID().toString().substring(0, 8);
@@ -62,11 +65,10 @@ class VertreterAggregateResourceTest {
                 .body("id", equalTo(testId))
                 .body("name", equalTo("Test Name"))
                 .body("email", equalTo(testEmail))
-                .body("version", equalTo(1));
+                .body("version", equalTo(0));
     }
 
     @Test
-    @Order(2)
     @DisplayName("GET /aggregates/vertreter - List all returns 200")
     void listAll_returns200() {
         given()
@@ -89,7 +91,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(3)
     @DisplayName("GET /aggregates/vertreter/email/{email} - Existing email returns 200")
     void getByExistingEmail_returns200() {
         String testId = "email-test-" + UUID.randomUUID().toString().substring(0, 8);
@@ -117,7 +118,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(4)
     @DisplayName("GET /aggregates/vertreter/vertretene-person/{id} - Returns list")
     void getByVertretenePersonId_returnsList() {
         String testId = "vp-test-" + UUID.randomUUID().toString().substring(0, 8);
@@ -162,7 +162,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(4)
     @DisplayName("GET /aggregates/vertreter/count - Returns count")
     void count_returnsCount() {
         given()
@@ -176,7 +175,6 @@ class VertreterAggregateResourceTest {
     // ==================== TRIGGER BEHAVIOR TESTS ====================
 
     @Test
-    @Order(10)
     @DisplayName("Event creates new aggregate with vertretene Person")
     void eventCreatesNewAggregateWithVertretenePerson() {
         String newId = "vp-trigger-" + UUID.randomUUID().toString().substring(0, 8);
@@ -220,11 +218,10 @@ class VertreterAggregateResourceTest {
                 .body("email", equalTo(newEmail))
                 .body("vertretenePerson.id", equalTo("p001"))
                 .body("vertretenePerson.name", equalTo("Erika Musterfrau"))
-                .body("version", equalTo(1));
+                .body("version", equalTo(0));
     }
 
     @Test
-    @Order(11)
     @DisplayName("Second event updates aggregate and increments version")
     void secondEventUpdatesAggregate() {
         String updateId = "update-test-" + UUID.randomUUID().toString().substring(0, 8);
@@ -238,7 +235,7 @@ class VertreterAggregateResourceTest {
                 .get(AGGREGATES_PATH + "/" + updateId)
                 .then()
                 .statusCode(200)
-                .body("version", equalTo(1));
+                .body("version", equalTo(0));
 
         // Create second event with updated data
         given()
@@ -271,11 +268,10 @@ class VertreterAggregateResourceTest {
                 .statusCode(200)
                 .body("name", equalTo("Updated Name"))
                 .body("email", equalTo(updateId + "@v2.com"))
-                .body("version", equalTo(2));
+                .body("version", equalTo(1));
     }
 
     @Test
-    @Order(12)
     @DisplayName("Delete event removes aggregate")
     void deleteEventRemovesAggregate() {
         String deleteId = "delete-test-" + UUID.randomUUID().toString().substring(0, 8);
@@ -320,7 +316,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(13)
     @DisplayName("Non-Vertreter event type does not create aggregate")
     void nonVertreterEventDoesNotCreateAggregate() {
         String otherId = "other-event-" + UUID.randomUUID().toString().substring(0, 8);
@@ -355,7 +350,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(14)
     @DisplayName("Partial update preserves existing fields")
     void partialUpdatePreservesFields() {
         String partialId = "partial-" + UUID.randomUUID().toString().substring(0, 8);
@@ -397,7 +391,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(15)
     @DisplayName("NULL fields in data are handled correctly")
     void nullFieldsHandled() {
         String nullTestId = "null-test-" + UUID.randomUUID().toString().substring(0, 8);
@@ -438,7 +431,6 @@ class VertreterAggregateResourceTest {
     // ==================== HANDLER EDGE CASE TESTS ====================
 
     @Test
-    @Order(20)
     @DisplayName("Event with missing data.id is processed without error")
     void eventWithMissingIdInData_stillProcessed() {
         // Send a vertreter.created event without data.id
@@ -462,7 +454,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(21)
     @DisplayName("Delete event for non-existing aggregate does not crash")
     void deleteNonExistingAggregate_noError() {
         String nonExistingId = "ghost-" + UUID.randomUUID().toString().substring(0, 8);
@@ -494,7 +485,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(22)
     @DisplayName("Update event without prior create acts as upsert")
     void updateNonExistingAggregate_createsNew() {
         String upsertId = "upsert-" + UUID.randomUUID().toString().substring(0, 8);
@@ -526,7 +516,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(23)
     @DisplayName("Full lifecycle: create → update → update → delete")
     void multipleHandlersInSequence() {
         String lcId = "lifecycle-" + UUID.randomUUID().toString().substring(0, 8);
@@ -540,7 +529,7 @@ class VertreterAggregateResourceTest {
         awaitProjection();
 
         given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(200)
-                .body("name", equalTo("V1")).body("version", equalTo(1));
+                .body("name", equalTo("V1")).body("version", equalTo(0));
 
         // Update 1
         given().contentType(ContentType.JSON).body("""
@@ -551,7 +540,7 @@ class VertreterAggregateResourceTest {
         awaitProjection();
 
         given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(200)
-                .body("name", equalTo("V2")).body("version", equalTo(2));
+                .body("name", equalTo("V2")).body("version", equalTo(1));
 
         // Update 2
         given().contentType(ContentType.JSON).body("""
@@ -564,7 +553,7 @@ class VertreterAggregateResourceTest {
         given().get(AGGREGATES_PATH + "/" + lcId).then().statusCode(200)
                 .body("name", equalTo("V2")) // preserved
                 .body("email", equalTo("lc-v3@test.com"))
-                .body("version", equalTo(3));
+                .body("version", equalTo(2));
 
         // Delete
         given().contentType(ContentType.JSON).body("""
@@ -578,7 +567,6 @@ class VertreterAggregateResourceTest {
     }
 
     @Test
-    @Order(24)
     @DisplayName("Update vertretene Person data on existing aggregate")
     void updateVertretenePersonData() {
         String vpId = "vp-update-" + UUID.randomUUID().toString().substring(0, 8);

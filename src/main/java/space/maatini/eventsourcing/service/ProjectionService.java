@@ -1,223 +1,39 @@
 package space.maatini.eventsourcing.service;
 
-import space.maatini.eventsourcing.entity.CloudEvent;
-import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
-import io.quarkus.logging.Log;
-import io.quarkus.runtime.StartupEvent;
-import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.vertx.core.runtime.context.VertxContextSafetyToggle;
-import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.pgclient.PgPool;
-import io.vertx.mutiny.sqlclient.SqlConnection;
-import io.vertx.mutiny.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import java.time.OffsetDateTime;
+
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-
+/**
+ * Facade for projection operations.
+ * Internals have been split into EventBatchProcessor, EventNotificationListener, 
+ * ProjectionMetrics and ProjectionReplayService to satisfy SRP.
+ */
 @ApplicationScoped
 public class ProjectionService {
-    private static final int BATCH_SIZE = 50;
-    private static final int MAX_RETRIES = 5;
-    private static final long STARTUP_DELAY_MS = 2000;
-    private static final long RECONNECT_DELAY_MS = 5000;
-    private static final long YIELD_DELAY_MS = 10;
 
-    private final PgPool pgPool;
-    private final Vertx vertx;
-    private final MeterRegistry meterRegistry;
-
-    private final java.util.Map<String, java.util.List<EventHandler>> handlerRegistry = new java.util.HashMap<>();
-    private final java.util.Set<Class<? extends space.maatini.eventsourcing.entity.AggregateRoot>> aggregateClasses = new java.util.HashSet<>();
-    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
-    private final AtomicBoolean rerunRequested = new AtomicBoolean(false);
-    private volatile SqlConnection listeningConnection;
-
-    private final Counter processedCounter;
-    private final Counter failedCounter;
-    private final Counter deadLetterCounter;
-    private volatile double currentLagSeconds = 0.0;
+    private final EventBatchProcessor batchProcessor;
+    private final ProjectionReplayService replayService;
+    private final ProjectionMetrics metrics;
 
     @Inject
-    public ProjectionService(PgPool pgPool, Vertx vertx, Instance<AggregateEventHandler<?>> handlerInstances, MeterRegistry meterRegistry) {
-        this.pgPool = pgPool;
-        this.vertx = vertx;
-        this.meterRegistry = meterRegistry;
-
-        processedCounter = meterRegistry.counter("projection.processed.events");
-        failedCounter = meterRegistry.counter("projection.failed.events");
-        deadLetterCounter = meterRegistry.counter("projection.deadletter.events");
-
-        Gauge.builder("projection.lag.seconds", this, ProjectionService::getLagSeconds)
-                .description("Current projection lag in seconds")
-                .register(meterRegistry);
-
-        handlerInstances.handles().forEach(handle -> {
-            AggregateEventHandler<?> handler = handle.get();
-            Class<?> beanClass = handle.getBean().getBeanClass();
-            HandlesEvents annotation = beanClass.getAnnotation(HandlesEvents.class);
-            if (annotation != null) {
-                String prefix = annotation.value();
-                handlerRegistry.computeIfAbsent(prefix, k -> new java.util.ArrayList<>()).add(handler);
-                aggregateClasses.add(annotation.aggregate());
-            }
-        });
+    public ProjectionService(EventBatchProcessor batchProcessor, ProjectionReplayService replayService, ProjectionMetrics metrics) {
+        this.batchProcessor = batchProcessor;
+        this.replayService = replayService;
+        this.metrics = metrics;
     }
 
     public double getLagSeconds() {
-        return currentLagSeconds;
-    }
-
-    public void onStart(@Observes StartupEvent ev) {
-        Log.infof("ProjectionService started with %d aggregate domain(s)", handlerRegistry.size());
-        vertx.setTimer(STARTUP_DELAY_MS, id -> listenForNotifications());
-    }
-
-    public void onStop(@Observes ShutdownEvent ev) {
-        if (listeningConnection != null) {
-            listeningConnection.close()
-                    .subscribe().with(v -> Log.info("Closed listener"), f -> Log.warn("Failed to close listener", f));
-        }
-    }
-
-    private void listenForNotifications() {
-        Log.info("Starting listener for 'events_channel'...");
-        pgPool.getConnection()
-                .invoke(conn -> {
-                    this.listeningConnection = conn;
-                    io.vertx.sqlclient.SqlConnection delegate = conn.getDelegate();
-                    if (delegate instanceof io.vertx.pgclient.PgConnection pgConn) {
-                        pgConn.notificationHandler(notification -> {
-                            Log.debugf("Received notification: %s", notification.getPayload());
-                            io.vertx.core.impl.ContextInternal context = ((io.vertx.core.impl.ContextInternal) vertx
-                                    .getDelegate().getOrCreateContext()).duplicate();
-                            VertxContextSafetyToggle.setContextSafe(context, true);
-                            context.runOnContext(v -> triggerBackgroundProcessing());
-                        });
-                    }
-                    conn.query("LISTEN events_channel").execute()
-                            .subscribe().with(item -> Log.info("Listening on 'events_channel'"), failure -> Log.error("Failed to LISTEN", failure));
-                })
-                .subscribe().with(
-                        conn -> conn.closeHandler(() -> {
-                            Log.warn("Postgres connection closed. Reconnecting in 5s...");
-                            vertx.setTimer(RECONNECT_DELAY_MS, id -> listenForNotifications());
-                        }),
-                        failure -> {
-                            Log.error("Failed to connect to Postgres. Retrying in 5s...", failure);
-                            vertx.setTimer(RECONNECT_DELAY_MS, id -> listenForNotifications());
-                        });
-    }
-
-    private void triggerBackgroundProcessing() {
-        if (isProcessing.compareAndSet(false, true)) {
-            runProcessingChain();
-        } else {
-            rerunRequested.set(true);
-        }
+        return metrics.getLagSeconds();
     }
 
     public Uni<Integer> triggerManualBatch() {
-        if (isProcessing.compareAndSet(false, true)) {
-            return processBatch()
-                    .onTermination().invoke(() -> isProcessing.set(false));
-        } else {
-            return Uni.createFrom().emitter(emitter -> {
-                vertx.setTimer(100, id -> triggerManualBatch().subscribe().with(emitter::complete, emitter::fail));
-            });
-        }
+        return batchProcessor.triggerManualBatch();
     }
 
-    private void runProcessingChain() {
-        processBatch()
-                .subscribe().with(
-                        count -> {
-                            if (count > 0) Log.debugf("Processed %d events", count);
-                            if (count == BATCH_SIZE || rerunRequested.compareAndSet(true, false)) {
-                                vertx.setTimer(YIELD_DELAY_MS, id -> runProcessingChain());
-                            } else {
-                                isProcessing.set(false);
-                            }
-                        },
-                        failure -> {
-                            Log.error("Failed to process batch", failure);
-                            isProcessing.set(false);
-                        });
-    }
-
-    @WithTransaction
-    protected Uni<Integer> processBatch() {
-        return CloudEvent.findUnprocessed(BATCH_SIZE)
-                .chain(events -> {
-                    if (events.isEmpty()) return Uni.createFrom().item(0);
-                    return Multi.createFrom().iterable(events)
-                            .onItem().transformToUniAndConcatenate(this::processEvent)
-                            .collect().last()
-                            .map(v -> events.size());
-                });
-    }
-
-    private Uni<Void> processEvent(CloudEvent event) {
-        String eventType = event.getType();
-        return handlerRegistry.entrySet().stream()
-                .filter(e -> eventType.startsWith(e.getKey()))
-                .flatMap(e -> e.getValue().stream())
-                .filter(h -> h.canHandle(eventType))
-                .findFirst()
-                .map(h -> h.handle(event)
-                        .chain(() -> markAsProcessed(event))
-                        .onFailure().recoverWithUni(t -> handleFailure(event, t)))
-                .orElseGet(() -> markAsProcessed(event));
-    }
-
-    private Uni<Void> handleFailure(CloudEvent event, Throwable t) {
-        Log.errorf(t, "Failed to process event %s", event.getId());
-        failedCounter.increment();
-
-        event.setFailedAt(OffsetDateTime.now());
-        event.setRetryCount((event.getRetryCount() == null ? 0 : event.getRetryCount()) + 1);
-        event.setErrorMessage(t.getMessage());
-
-        if (event.getRetryCount() >= MAX_RETRIES) {
-            deadLetterCounter.increment();
-            Log.warnf("Event %s moved to dead-letter after %d retries", event.getId(), event.getRetryCount());
-            return event.delete().replaceWithVoid();   // in der nächsten Phase in dead_letter Tabelle verschieben
-        }
-        return event.persist().replaceWithVoid();
-    }
-
-    private Uni<Void> markAsProcessed(CloudEvent event) {
-        event.setProcessedAt(OffsetDateTime.now());
-        processedCounter.increment();
-        return event.persist().replaceWithVoid();
-    }
-
-    @WithTransaction
     public Uni<Integer> replayAll(UUID fromEventId) {
-        Log.info("Starting generic replay for all aggregates");
-        Uni<Void> deleteAll = Multi.createFrom().iterable(aggregateClasses)
-                .onItem().transformToUniAndConcatenate(clazz -> CloudEvent.getSession()
-                        .chain(s -> s.createQuery("DELETE FROM " + clazz.getSimpleName()).executeUpdate())
-                        .replaceWithVoid())
-                .collect().last().replaceWithVoid();
-
-        return deleteAll.chain(() -> {
-            String update = "UPDATE CloudEvent SET processedAt = null, failedAt = null, retryCount = 0, errorMessage = null";
-            if (fromEventId != null) {
-                return CloudEvent.<CloudEvent>findById(fromEventId)
-                        .chain(ref -> ref != null
-                                ? CloudEvent.update(update + " WHERE createdAt >= ?1", ref.getCreatedAt())
-                                : CloudEvent.update(update));
-            }
-            return CloudEvent.update(update);
-        }).invoke(count -> Log.infof("Replay finished – %d events reset", count));
+        return replayService.replayAll(fromEventId);
     }
 }

@@ -1,0 +1,94 @@
+package space.maatini.eventsourcing.domain;
+
+import space.maatini.eventsourcing.entity.CloudEvent;
+import space.maatini.eventsourcing.dto.command.CreateVertreterCommand;
+import space.maatini.eventsourcing.dto.command.UpdateVertreterCommand;
+import io.vertx.core.json.JsonObject;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+public class Vertreter extends AggregateRoot {
+    private boolean deleted = false;
+    private boolean created = false;
+
+    public Vertreter(String id) {
+        super(id);
+    }
+
+    public void create(CreateVertreterCommand cmd) {
+        if (created) throw new IllegalStateException("Vertreter was already created");
+        
+        JsonObject data = new JsonObject()
+            .put("id", cmd.id())
+            .put("name", cmd.name());
+        
+        if (cmd.email() != null) data.put("email", cmd.email());
+        if (cmd.vertretenePerson() != null) {
+             data.put("vertretenePerson", new JsonObject()
+                 .put("id", cmd.vertretenePerson().id())
+                 .put("name", cmd.vertretenePerson().name()));
+        }
+
+        CloudEvent event = new CloudEvent();
+        event.setId(UUID.randomUUID());
+        event.setType("space.maatini.vertreter.created");
+        event.setSource("/commands/vertreter");
+        event.setSubject(cmd.id());
+        event.setTime(OffsetDateTime.now());
+        event.setData(data);
+
+        applyNewEvent(event);
+    }
+
+    public void update(UpdateVertreterCommand cmd) {
+        if (!created) throw new IllegalStateException("Vertreter does not exist or was not created yet");
+        if (deleted) throw new IllegalStateException("Vertreter was deleted");
+
+        JsonObject data = new JsonObject().put("id", cmd.id());
+        if (cmd.name() != null) data.put("name", cmd.name());
+        if (cmd.email() != null) data.put("email", cmd.email());
+        if (cmd.vertretenePerson() != null) {
+             data.put("vertretenePerson", new JsonObject()
+                 .put("id", cmd.vertretenePerson().id())
+                 .put("name", cmd.vertretenePerson().name()));
+        }
+
+        CloudEvent event = new CloudEvent();
+        event.setId(UUID.randomUUID());
+        event.setType("space.maatini.vertreter.updated");
+        event.setSource("/commands/vertreter");
+        event.setSubject(cmd.id());
+        event.setTime(OffsetDateTime.now());
+        event.setData(data);
+
+        applyNewEvent(event);
+    }
+
+    public void delete() {
+        if (!created) throw new IllegalStateException("Vertreter does not exist");
+        if (deleted) throw new IllegalStateException("Vertreter was already deleted");
+
+        JsonObject data = new JsonObject().put("id", getId());
+        CloudEvent event = new CloudEvent();
+        event.setId(UUID.randomUUID());
+        event.setType("space.maatini.vertreter.deleted");
+        event.setSource("/commands/vertreter");
+        event.setSubject(getId());
+        event.setTime(OffsetDateTime.now());
+        event.setData(data);
+
+        applyNewEvent(event);
+    }
+
+    @Override
+    protected void mutate(CloudEvent event) {
+        switch (event.getType()) {
+            case "space.maatini.vertreter.created":
+                this.created = true;
+                break;
+            case "space.maatini.vertreter.deleted":
+                this.deleted = true;
+                break;
+        }
+    }
+}

@@ -4,9 +4,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 
 import java.util.UUID;
 
@@ -24,8 +21,15 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  * other tests.
  */
 @QuarkusTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AdminResourceTest {
+
+    @org.junit.jupiter.api.BeforeEach
+    void cleanup() {
+        io.restassured.RestAssured.given()
+            .post("/test-support/wipe")
+            .then()
+            .statusCode(200);
+    }
 
     private static final String ADMIN_PATH = "/admin";
     private static final String EVENTS_PATH = "/events";
@@ -47,7 +51,6 @@ class AdminResourceTest {
     }
 
     @Test
-    @Order(1)
     @DisplayName("POST /admin/projection/trigger - Returns 200 with processed count")
     void triggerProjection_returns200() {
         // First, create an event so there's something to process
@@ -81,7 +84,6 @@ class AdminResourceTest {
     }
 
     @Test
-    @Order(2)
     @DisplayName("POST /admin/projection/trigger - Returns 0 when no unprocessed events")
     void triggerProjection_noEvents_returnsZero() {
         // Drain any pending first
@@ -97,7 +99,6 @@ class AdminResourceTest {
     }
 
     @Test
-    @Order(10)
     @DisplayName("POST /admin/replay - Replays all events and returns count")
     void replayAll_returns200() {
         // Create some test data first
@@ -135,7 +136,6 @@ class AdminResourceTest {
     }
 
     @Test
-    @Order(11)
     @DisplayName("POST /admin/replay - Side effect: aggregates are rebuilt after replay + trigger")
     void replayAll_rebuildsSideEffects() {
         // Create and project an event
@@ -171,7 +171,6 @@ class AdminResourceTest {
     }
 
     @Test
-    @Order(12)
     @DisplayName("POST /admin/replay?fromEventId=... - Replay with filter parameter")
     void replayAll_withFromEventId() {
         given()

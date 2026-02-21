@@ -4,21 +4,22 @@ import io.smallrye.mutiny.Uni;
 
 /**
  * Marker interface for all aggregate roots in the event sourcing system.
+ * Verbessert für stabiles Replay.
  */
 public interface AggregateRoot {
+
     /**
      * Deletes all instances of this aggregate.
-     * Used for full replays.
+     * Used for full replays (now works with PanacheEntityBase).
      */
     static Uni<Long> deleteAll() {
-        throw new UnsupportedOperationException("Subclasses must implement static deleteAll()");
+        throw new UnsupportedOperationException("Concrete aggregates inherit deleteAll() from PanacheEntityBase");
     }
 
     /**
-     * Returns the table name for this aggregate.
-     * Used for generic SQL operations.
+     * Returns the JPQL entity name (usually the simple class name).
      */
-    static String getTableName() {
-        throw new UnsupportedOperationException("Subclasses must implement static getTableName()");
+    static String getEntityName() {
+        throw new UnsupportedOperationException("Override or use getSimpleName() in ProjectionService");
     }
 }

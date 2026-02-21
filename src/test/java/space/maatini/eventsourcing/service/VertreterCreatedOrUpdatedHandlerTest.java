@@ -35,7 +35,10 @@ class VertreterCreatedOrUpdatedHandlerTest {
 
     @BeforeEach
     void cleanup() {
-        runInVertx(() -> Panache.withTransaction(() -> VertreterAggregate.deleteAll()));
+        runInVertx(() -> Panache.withTransaction(() -> 
+            VertreterAggregate.deleteAll()
+                .chain(() -> CloudEvent.deleteAll())
+        ));
     }
 
     @Test
@@ -55,7 +58,7 @@ class VertreterCreatedOrUpdatedHandlerTest {
         assertNotNull(agg);
         assertEquals("Max Mustermann", agg.getName());
         assertEquals("max@example.com", agg.getEmail());
-        assertEquals(1, agg.getVersion());
+        assertEquals(0, agg.getVersion());
     }
 
     @Test
@@ -74,7 +77,7 @@ class VertreterCreatedOrUpdatedHandlerTest {
 
         assertEquals("New Name", agg.getName());
         assertEquals("old@example.com", agg.getEmail()); // preserved
-        assertEquals(2, agg.getVersion());
+        assertEquals(1, agg.getVersion());
     }
 
     @Test
@@ -93,7 +96,7 @@ class VertreterCreatedOrUpdatedHandlerTest {
 
         assertEquals("Name", agg.getName());
         assertEquals("new@example.com", agg.getEmail());
-        assertEquals(2, agg.getVersion());
+        assertEquals(1, agg.getVersion());
     }
 
     @Test
@@ -156,7 +159,6 @@ class VertreterCreatedOrUpdatedHandlerTest {
             agg.setId(id);
             agg.setName(name);
             agg.setEmail(email);
-            agg.setVersion(1);
             return agg.persist();
         }));
     }

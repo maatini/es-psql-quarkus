@@ -39,6 +39,7 @@ public class VertreterAggregate extends PanacheEntityBase implements AggregateRo
     @Column(name = "event_id")
     private UUID eventId;
 
+    @jakarta.persistence.Version
     private Integer version;
 
     // --- Getters & Setters ---

@@ -32,8 +32,11 @@ public class VertreterCreatedOrUpdatedHandler implements AggregateEventHandler<V
 
         return VertreterAggregate.<VertreterAggregate>findById(id)
                 .chain(existing -> {
-                    VertreterAggregate agg = existing != null ? existing : new VertreterAggregate();
-                    agg.setId(id);
+                    boolean isNew = existing == null;
+                    VertreterAggregate agg = isNew ? new VertreterAggregate() : existing;
+                    if (isNew) {
+                        agg.setId(id);
+                    }
 
                     // Patch semantics: only update fields present in event data
                     if (data.containsKey("name"))
@@ -51,9 +54,12 @@ public class VertreterCreatedOrUpdatedHandler implements AggregateEventHandler<V
 
                     agg.setUpdatedAt(event.getTime() != null ? event.getTime() : OffsetDateTime.now());
                     agg.setEventId(event.getId());
-                    agg.setVersion((agg.getVersion() == null ? 0 : agg.getVersion()) + 1);
 
-                    return agg.persist();
+                    if (isNew) {
+                        return agg.persist();
+                    } else {
+                        return Uni.createFrom().item(agg); // Managed entity auto-flushes changes
+                    }
                 })
                 .replaceWithVoid();
     }

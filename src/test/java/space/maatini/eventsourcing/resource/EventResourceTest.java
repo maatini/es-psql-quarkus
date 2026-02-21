@@ -5,9 +5,6 @@ import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 
 import java.util.UUID;
 
@@ -21,8 +18,15 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
  * Tests cover happy path, validation edge cases, and boundary conditions.
  */
 @QuarkusTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class EventResourceTest {
+
+    @org.junit.jupiter.api.BeforeEach
+    void cleanup() {
+        io.restassured.RestAssured.given()
+            .post("/test-support/wipe")
+            .then()
+            .statusCode(200);
+    }
 
     private static final String EVENTS_PATH = "/events";
 
@@ -33,7 +37,6 @@ class EventResourceTest {
     class HappyPath {
 
         @Test
-        @Order(1)
         @DisplayName("POST /events - Create valid event returns 201")
         void createValidEvent_returns201() {
             String eventId = UUID.randomUUID().toString();
@@ -53,7 +56,6 @@ class EventResourceTest {
         }
 
         @Test
-        @Order(2)
         @DisplayName("POST /events - Duplicate event ID returns 200 (idempotent)")
         void duplicateEventId_returns200() {
             String eventId = UUID.randomUUID().toString();
@@ -80,7 +82,6 @@ class EventResourceTest {
         }
 
         @Test
-        @Order(3)
         @DisplayName("GET /events/{id} - Get existing event returns 200")
         void getExistingEvent_returns200() {
             String eventId = UUID.randomUUID().toString();
@@ -114,7 +115,6 @@ class EventResourceTest {
         }
 
         @Test
-        @Order(4)
         @DisplayName("GET /events/subject/{subject} - Returns events for subject")
         void getEventsBySubject_returnsEvents() {
             String subject = "subject-" + UUID.randomUUID();
@@ -139,7 +139,6 @@ class EventResourceTest {
         }
 
         @Test
-        @Order(5)
         @DisplayName("GET /events/type/{type} - Returns events by type")
         void getEventsByType_returnsEvents() {
             given()

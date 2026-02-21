@@ -1,14 +1,15 @@
 package space.maatini.eventsourcing.health;
 
-import io.quarkus.health.HealthCheck;
-import io.quarkus.health.HealthCheckResponse;
-import io.quarkus.health.HealthCheckResponseBuilder;
+import org.eclipse.microprofile.health.HealthCheck;
+import org.eclipse.microprofile.health.HealthCheckResponse;
+import org.eclipse.microprofile.health.HealthCheckResponseBuilder;
+import org.eclipse.microprofile.health.Readiness;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import space.maatini.eventsourcing.service.ProjectionService;
 
 @ApplicationScoped
-@Health
+@Readiness
 public class ProjectionHealthCheck implements HealthCheck {
 
     private final ProjectionService projectionService;
@@ -24,11 +25,11 @@ public class ProjectionHealthCheck implements HealthCheck {
         HealthCheckResponseBuilder builder = HealthCheckResponse.named("projection");
 
         if (lag > 300) {
-            builder.down().withData("lagSeconds", lag).withData("status", "CRITICAL");
+            builder.down().withData("lagSeconds", (long) lag).withData("status", "CRITICAL");
         } else if (lag > 30) {
-            builder.up().withData("lagSeconds", lag).withData("status", "WARNING");
+            builder.up().withData("lagSeconds", (long) lag).withData("status", "WARNING");
         } else {
-            builder.up().withData("lagSeconds", lag).withData("status", "OK");
+            builder.up().withData("lagSeconds", (long) lag).withData("status", "OK");
         }
         return builder.build();
     }
