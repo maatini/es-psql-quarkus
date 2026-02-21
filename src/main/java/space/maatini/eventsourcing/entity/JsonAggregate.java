@@ -3,6 +3,7 @@ package space.maatini.eventsourcing.entity;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.json.JsonObject;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
@@ -25,11 +26,16 @@ public class JsonAggregate extends PanacheEntityBase implements AggregateRoot {
     @Id
     public String id;
 
+    @Column(name = "state", nullable = false, columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
-    public JsonObject state = new JsonObject();
+    public java.util.Map<String, Object> state = new java.util.HashMap<>();
 
     public Integer version = 0;
+    
+    @Column(name = "last_event_id")
     public UUID lastEventId;
+
+    @Column(name = "updated_at")
     public OffsetDateTime updatedAt = OffsetDateTime.now();
 
     /**
@@ -66,6 +72,6 @@ public class JsonAggregate extends PanacheEntityBase implements AggregateRoot {
 
     public static Uni<JsonObject> findState(String type, String id) {
         return findByTypeAndId(type, id)
-                .map(agg -> agg != null ? agg.state : null);
+                .map(agg -> agg != null ? new JsonObject(agg.state) : null);
     }
 }

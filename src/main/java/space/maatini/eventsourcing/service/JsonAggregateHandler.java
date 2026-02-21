@@ -31,7 +31,7 @@ public interface JsonAggregateHandler extends EventHandler {
 
         return JsonAggregate.findByTypeAndId(type, id)
                 .chain(existing -> {
-                    JsonObject current = existing != null ? existing.state.copy() : new JsonObject();
+                    JsonObject current = existing != null ? new JsonObject(existing.state).copy() : new JsonObject();
                     JsonObject newState = apply(current, event);
 
                     // Wenn null zurückgegeben wird, könnte das Löschen bedeuten
@@ -42,7 +42,7 @@ public interface JsonAggregateHandler extends EventHandler {
                     JsonAggregate agg = existing != null ? existing : new JsonAggregate();
                     agg.type = type;
                     agg.id = id;
-                    agg.state = newState;
+                    agg.state = newState.getMap();
                     agg.version = (existing != null ? existing.version : 0) + 1;
                     agg.lastEventId = event.getId();
                     agg.updatedAt = event.getTime() != null ? event.getTime() : OffsetDateTime.now();

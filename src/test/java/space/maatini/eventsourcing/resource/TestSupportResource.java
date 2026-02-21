@@ -17,7 +17,7 @@ public class TestSupportResource {
         return CloudEvent.getSession().chain(session ->
                 session.createNativeQuery("DELETE FROM events_dead_letter").executeUpdate()
         )
-        .chain(() -> space.maatini.eventsourcing.entity.VertreterAggregate.deleteAll())
+        .chain(() -> space.maatini.eventsourcing.entity.JsonAggregate.deleteAll())
         .chain(() -> CloudEvent.deleteAll())
         .replaceWith(Response.ok().build());
     }
