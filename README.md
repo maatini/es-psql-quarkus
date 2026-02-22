@@ -21,7 +21,8 @@ graph TD
     end
 
     subgraph "Database Layer"
-        DB_Events --> |"TRIGGER"| DB_Notify["NOTIFY events_channel"]
+        DB_Events --> |"SQL TRIGGER"| DB_Notify["NOTIFY events_channel"]
+        note["Erfordert init.sql Trigger"]
     end
 
     subgraph "Outbox (Garantierte Zustellung)"
@@ -111,6 +112,7 @@ Swagger UI: http://localhost:8080/q/swagger-ui
 - **Event Versioning** via `dataVersion` für reibungslose Schema-Evolution
 - **Optimistic Concurrency Control** – DB-Level Schutz vor Race-Conditions (HTTP 409 Conflict)
 - **True CQRS** – Strikte Trennung von Command-Logik und generischer Read-Side
+- **Low-Latency Push-Projektionen** – Sofortige Aktualisierung via PostgreSQL `LISTEN/NOTIFY` (erfordert `db/init.sql` Trigger)
 - **Vollständig generisches JSON-Read-Model** – Projektionen ohne SQL-Migrationen oder Boilerplate-Entities
 - **High Observability** – Inklusive Health-Checks (mit Lag-Metric) und Prometheus Export
 - **Low Footprint** – Optimiert für Quarkus und PostgreSQL Reactive

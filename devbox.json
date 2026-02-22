@@ -9,10 +9,10 @@
     "github-cli@latest"
   ],
   "env": {
-    "PGDATA":     "$PWD/.devbox/pgdata",
-    "PGHOST":     "localhost",
-    "PGPORT":     "5432",
-    "PGUSER":     "$USER",
+    "PGDATA": "$PWD/.devbox/pgdata",
+    "PGHOST": "localhost",
+    "PGPORT": "5432",
+    "PGUSER": "$USER",
     "PGPASSWORD": "devpassword",
     "PGDATABASE": "devdb"
   },
@@ -75,7 +75,13 @@
         "  echo '📦 Erstelle Datenbank $PGDATABASE...'",
         "  createdb \"$PGDATABASE\"",
         "  echo '✅ Datenbank $PGDATABASE erstellt'",
-        "fi"
+        "fi",
+        "devbox run pg:init-schema"
+      ],
+      "pg:init-schema": [
+        "echo '📦 Initialisiere Schema (Trigger, Funktionen)...'",
+        "psql -d \"$PGDATABASE\" -f db/init.sql",
+        "echo '✅ Schema initialisiert'"
       ],
       "pg:psql": [
         "psql -d \"$PGDATABASE\""
